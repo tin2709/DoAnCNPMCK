@@ -52,5 +52,11 @@ public class OrderController {
         orderService.updateOrder(request.getOrderId(), request.getStatusId());
         return ResponseEntity.ok().build();
     }
+    @GetMapping("/list")
+    public ResponseEntity<List<Order>> getOrders() {
+        List<Order> list = orderService.getAllOrders();
+        return ResponseEntity.ok(list);
+    }
+
 
 }

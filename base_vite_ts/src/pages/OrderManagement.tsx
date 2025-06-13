@@ -1,25 +1,37 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format } from 'date-fns'
 import OrderDetails from './OrderDetails'
 const OrderManagement = () => {
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      orderCode: 'ORD001',
-      customerName: 'John Doe',
-      totalAmount: 1500000,
-      status: 'pending',
-      orderDate: new Date(2024, 0, 15)
-    },
-    {
-      id: 2,
-      orderCode: 'ORD002',
-      customerName: 'Jane Smith',
-      totalAmount: 2500000,
-      status: 'approved',
-      orderDate: new Date(2024, 0, 16)
-    }
-  ])
+  // const [orders, setOrders] = useState([
+  //   {
+  //     id: 1,
+  //     orderCode: 'ORD001',
+  //     customerName: 'John Doe',
+  //     totalAmount: 1500000,
+  //     status: 'pending',
+  //     orderDate: new Date(2024, 0, 15)
+  //   },
+  //   {
+  //     id: 2,
+  //     orderCode: 'ORD002',
+  //     customerName: 'Jane Smith',
+  //     totalAmount: 2500000,
+  //     status: 'approved',
+  //     orderDate: new Date(2024, 0, 16)
+  //   }
+  // ])
+  const [orders, setOrders] = useState([]);
+  useEffect(()=> {
+    // fetch('https://example.com/api/data')
+    //   .then(response => response.json())
+    //   .then(data => {
+    //     console.log(data); // dữ liệu nhận được
+    //   })
+    //   .catch(error => {
+    //     console.error('Có lỗi:', error);
+    //   });
+
+  },[]);
 
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')

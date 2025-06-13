@@ -1,5 +1,7 @@
 package com.example.InvoiceManage.controller;
 
+import com.example.InvoiceManage.DTO.request.OrderRequest;
+import com.example.InvoiceManage.DTO.request.OrderUpdate;
 import com.example.InvoiceManage.entity.Order;
 import com.example.InvoiceManage.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +42,15 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
-
+    @PostMapping("/add")
+    public ResponseEntity<Void> addOrder(@RequestBody OrderRequest request) {
+        orderService.addOrder(request);
+        return ResponseEntity.ok().build();
+    }
+    @PutMapping("/update")
+    public ResponseEntity<Void> updateOrder(@RequestBody OrderUpdate request) {
+        orderService.updateOrder(request.getOrderId(), request.getStatusId());
+        return ResponseEntity.ok().build();
+    }
 
 }

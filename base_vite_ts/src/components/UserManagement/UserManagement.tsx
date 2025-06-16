@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FiUserPlus, FiEdit2, FiTrash2 } from 'react-icons/fi'
 import { format } from 'date-fns'
+import { useNavigate } from "react-router-dom";
 
 interface User {
   id: number

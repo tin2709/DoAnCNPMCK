@@ -30,13 +30,9 @@ public class User {
     @Column(name = "password", nullable = false)
     private String password;
 
-    @Column(name = "phone", length = 20)
-    private String phone;
-
     @Column(name = "active")
     private Boolean active;
 
-    @Column(name = "picture")
-    private String picture;
+
 
 }

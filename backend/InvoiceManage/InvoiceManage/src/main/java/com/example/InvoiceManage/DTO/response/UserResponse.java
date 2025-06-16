@@ -1,31 +1,19 @@
+// File: com.example.InvoiceManage.DTO.response.UserResponse.java
 package com.example.InvoiceManage.DTO.response;
 
-import com.example.InvoiceManage.entity.Role;
-import jakarta.persistence.Column;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import lombok.Getter;
-import lombok.Setter;
+import com.example.InvoiceManage.entity.Role; // Assuming Role entity is acceptable for direct inclusion
 
-@Getter
-@Setter
+import lombok.AllArgsConstructor; // Add this if you want an all-args constructor
+import lombok.Data;
+import lombok.NoArgsConstructor; // Add this if you want a no-args constructor
+
+@Data // Provides getters, setters, equals, hashCode, toString
+@NoArgsConstructor // Lombok annotation for no-argument constructor
+@AllArgsConstructor // Lombok annotation for constructor with all fields
 public class UserResponse {
-    private Integer id;
-
+    private Long id;
     private String email;
-
     private String name;
-
-    private Role role;
-
-    private String password;
-
-    private String phone;
-
-    private Boolean active;
-
-    private String picture;
-
-    private Boolean role1 = false;
+    private Role role; // Only include the Role object here
+    private String accessToken;
 }

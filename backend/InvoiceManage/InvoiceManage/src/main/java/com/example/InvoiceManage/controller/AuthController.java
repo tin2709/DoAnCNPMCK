@@ -1,7 +1,7 @@
 package com.example.InvoiceManage.controller;
 
 import com.example.InvoiceManage.DTO.request.LoginRequest;
-import com.example.InvoiceManage.DTO.request.RegisterRequest;
+import com.example.InvoiceManage.DTO.request.UserRegistrationRequest;
 import com.example.InvoiceManage.DTO.response.UserResponse;
 import com.example.InvoiceManage.entity.User;
 import com.example.InvoiceManage.service.UserService;
@@ -28,7 +28,7 @@ public ResponseEntity<?> login(@RequestBody LoginRequest request) {
 }
 
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@RequestBody UserRegistrationRequest request) {
         try {
             User user = userService.register(request);
             return ResponseEntity.ok(user);

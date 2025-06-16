@@ -4,6 +4,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { CalendarIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const Dashboard: React.FC = () => {
   const [startDate, setStartDate] = useState("");
@@ -12,6 +13,11 @@ const Dashboard: React.FC = () => {
   const [totalOrders, setTotalOrders] = useState(0);
   const [totalValue, setTotalValue] = useState(0);
 
+  const navigate = useNavigate();
+
+  const handleViewStats = () => {
+    navigate("/login");
+  };
   const transformDataToMonths = (data: any[]) => {
     const months = Array(12).fill(0);
     data.forEach((item) => {
@@ -74,7 +80,7 @@ const Dashboard: React.FC = () => {
             <CalendarIcon className="absolute left-2 top-2.5 text-gray-500" size={20} />
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="pl-8" />
           </div>
-          <Button onClick={fetchStatistics}>Xem thống kê</Button>
+          <Button onClick={handleViewStats}>Xem thống kê</Button>
         </div>
 
         {/* 📌 Thông tin tổng quan */}

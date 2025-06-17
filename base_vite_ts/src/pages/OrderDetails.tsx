@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { FiPrinter, FiRotateCcw } from 'react-icons/fi'
-import { FaBox, FaTruck, FaCheckCircle } from 'react-icons/fa'
+import {FaCheckCircle } from 'react-icons/fa'
 
 interface OrderDetailsProps {
   onClose: () => void

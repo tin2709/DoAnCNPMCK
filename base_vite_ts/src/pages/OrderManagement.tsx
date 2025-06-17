@@ -52,7 +52,7 @@ const OrderManagement = () => {
   });
 
   return (
-    
+
     <div className='max-w-7xl mx-auto'>
       {selectedOrder ? (
         <OrderDetails onClose={() => setSelectedOrder(null)} />

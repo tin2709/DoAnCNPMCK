@@ -2,11 +2,27 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FaGoogle, FaApple } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"; // Đã sửa lỗi ở đây
 import Swal from 'sweetalert2'; // Import SweetAlert2
 
 // Đảm bảo bạn đã cài đặt axios: npm install axios
 import axios from 'axios';
+
+// Định nghĩa kiểu dữ liệu cho phản hồi từ API để dễ dàng truy cập thuộc tính
+interface Role {
+  id: number;
+  roleName: string;
+}
+
+interface UserResponse {
+  id: number;
+  email: string;
+  name: string;
+  role: Role;
+  password?: string; // Mật khẩu thường không nên được trả về, nhưng nếu có thì thêm vào
+  active: boolean;
+  accessToken: string; // Đảm bảo trường này có trong DTO của Spring Boot khi login thành công
+}
 
 const App: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -14,24 +30,22 @@ const App: React.FC = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const navigate = useNavigate();
 
-  // Dòng này đã được bỏ đi vì nó sẽ chuyển hướng ngay lập tức khi component được render
-  // navigate("/");
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Sử dụng axios.post()
-      const response = await axios.post("http://localhost:8080/api/auth/login", {
-        // Đảm bảo tên trường khớp với DTO của Spring Boot (Email với E viết hoa)
+      const response = await axios.post<UserResponse>("http://localhost:8080/api/auth/login", {
         email: email,
         password: password,
       });
 
-      // Nếu request thành công (status 2xx), axios sẽ không ném lỗi
-      const data = response.data; // Dữ liệu phản hồi đã được parsing sẵn bởi axios
+      const data = response.data; // Dữ liệu phản hồi (chỉ khi đăng nhập thành công và tài khoản active)
+      const accessToken = response.data.accessToken;
 
-      // Lưu thông tin response vào localStorage
+      // Không cần kiểm tra `data.active` ở đây nữa, vì backend đã xử lý và ném lỗi 403 nếu bị chặn.
+      // Nếu đến được đây, nghĩa là tài khoản active và đăng nhập thành công.
+
       localStorage.setItem('userLoginInfo', JSON.stringify(data));
+      localStorage.setItem('accessToken', accessToken);
 
       Swal.fire({
         icon: 'success',
@@ -40,17 +54,36 @@ const App: React.FC = () => {
         showConfirmButton: false,
         timer: 1500
       }).then(() => {
-        // Chuyển hướng đến trang chủ (/)
-        navigate("/");
+        const userRole = data.role?.roleName;
+
+        if (userRole === "ADMIN") {
+          navigate("/admin");
+        } else if (userRole === "USER") {
+          navigate("/user");
+        } else {
+          navigate("/user");
+        }
       });
 
-    } catch (error: any) { // axios lỗi sẽ nằm trong catch block
+    } catch (error: any) {
       let errorMessage = "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.";
 
       if (axios.isAxiosError(error) && error.response) {
-        // Lỗi từ server (ví dụ: 401 Unauthorized, 400 Bad Request)
         if (error.response.status === 401) {
+          // Lỗi từ server: 401 Unauthorized (sai email/mật khẩu)
           errorMessage = error.response.data || "Sai email hoặc mật khẩu.";
+        } else if (error.response.status === 403) {
+          // Lỗi từ server: 403 Forbidden (tài khoản bị chặn)
+          Swal.fire({
+            icon: 'warning',
+            title: 'Tài khoản bị chặn!',
+            text: error.response.data || 'Tài khoản của bạn đã bị quản trị viên chặn. Vui lòng liên hệ hỗ trợ để biết thêm chi tiết.',
+            confirmButtonText: 'Đóng'
+          });
+          // Xóa thông tin đăng nhập đã lưu trong localStorage nếu có
+          localStorage.removeItem('userLoginInfo');
+          localStorage.removeItem('accessToken');
+          return; // Dừng hàm tại đây, không hiển thị thông báo lỗi chung
         } else if (error.response.status === 400) {
           errorMessage = error.response.data || "Dữ liệu gửi lên không hợp lệ.";
         } else {
@@ -59,14 +92,17 @@ const App: React.FC = () => {
       } else {
         // Lỗi mạng hoặc lỗi khác không phải từ axios
         errorMessage = "Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của bạn.";
-        console.error("Login API call error:", error); // Ghi log lỗi để dễ debug hơn
+        console.error("Login API call error:", error);
       }
 
-      Swal.fire({
-        icon: 'error',
-        title: 'Đăng nhập thất bại!',
-        text: errorMessage,
-      });
+      // Chỉ hiển thị Swal lỗi chung nếu chưa có Swal nào được hiển thị (ví dụ: Swal cảnh báo tài khoản bị chặn)
+      if (!Swal.isVisible()) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Đăng nhập thất bại!',
+          text: errorMessage,
+        });
+      }
     }
   };
 

@@ -12,6 +12,7 @@ import java.math.BigDecimal;
 @Table(name = "product")
 public class Product {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // <--- THAY ĐỔI 1: Thêm vào đây
     @Column(name = "id", nullable = false)
     private Integer id;
 
@@ -22,6 +23,7 @@ public class Product {
     @Column(name = "product_name", nullable = false)
     private String productName;
 
+    @Lob // <--- THAY ĐỔI 2: Thêm vào đây
     @Column(name = "image")
     private String image;
 

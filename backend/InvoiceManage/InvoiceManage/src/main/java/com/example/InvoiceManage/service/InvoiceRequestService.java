@@ -65,4 +65,20 @@ public class InvoiceRequestService {
         invoiceRepository.save(invoice);
     }
 
+    @Transactional
+    public void rejectInvoiceRequest(Long requestId) {
+        InvoiceRequest request = invoiceRequestRepository.findById(requestId)
+                .orElseThrow(() -> new RuntimeException("Yêu cầu hóa đơn không tồn tại"));
+
+        Status rejectedStatus = statusRepository.findByStatusName("rejected");
+
+        if (rejectedStatus == null) {
+            throw new RuntimeException("Không tìm thấy status 'rejected'");
+        }
+
+        // Cập nhật trạng thái yêu cầu hóa đơn
+        request.setStatus(rejectedStatus);
+        invoiceRequestRepository.save(request);
+    }
+
 }

@@ -28,4 +28,11 @@ public class InvoiceRequestController {
         invoiceRequestService.acceptInvoiceRequest(id);
         return ResponseEntity.ok("Yêu cầu đã được chấp nhận và hóa đơn đã được tạo");
     }
+
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<String> rejectInvoiceRequest(@PathVariable("id") Long id) { // ✅ đúng
+        invoiceRequestService.rejectInvoiceRequest(id);
+        return ResponseEntity.ok("Yêu cầu đã bị từ chối.");
+    }
+
 }

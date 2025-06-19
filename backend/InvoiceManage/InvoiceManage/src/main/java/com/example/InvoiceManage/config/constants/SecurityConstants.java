@@ -13,7 +13,8 @@ public class SecurityConstants {
             API_PREFIX + "/swagger-ui/**",
             API_PREFIX + "/v3/api-docs/**",
             API_PREFIX + "/webjars/**",
-            API_PREFIX + "/favicon.ico"
+            API_PREFIX + "/favicon.ico",
+            API_PREFIX+"/vnpay/IPN"
     };
 
     // Other security constants if any

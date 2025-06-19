@@ -1,388 +1,316 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import { FiRefreshCw, FiSend } from 'react-icons/fi'; // Import icons for better visuals
 
-// Define the structure of a message
-interface Message {
-  sender: 'user' | 'bot';
-  text: string;
+// --- INTERFACES & TYPES ---
+
+// Định nghĩa cấu trúc tin nhắn mà backend yêu cầu
+interface ApiMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
-// Define the props for the Chatbox component
+// Định nghĩa props cho component
 interface ChatboxProps {
   onClose: () => void;
 }
 
-// Style types
-type ChatboxStyles = {
-  container: React.CSSProperties;
-  header: React.CSSProperties;
-  closeButton: React.CSSProperties;
-  messagesContainer: React.CSSProperties;
-  messageBubble: (sender: 'user' | 'bot') => React.CSSProperties;
-  messageText: (sender: 'user' | 'bot') => React.CSSProperties;
-  botIcon: React.CSSProperties;
-  inputArea: React.CSSProperties;
-  inputField: React.CSSProperties;
-  sendButton: React.CSSProperties;
-  // For typing indicator specifically - these will be added after initial declaration
-  typingIndicatorBubble?: React.CSSProperties;
-  typingIndicatorDotContainer?: React.CSSProperties;
+// --- API CONFIGURATION ---
+const API_BASE_URL = 'http://localhost:8080/api/chat'; // Centralize base URL
+const DOCUMENT_PATH = 'C:/Users/ADMIN/Documents/Word DA CNPM.docx'; // Đường dẫn file tài liệu
+
+// --- HELPER FUNCTIONS ---
+
+// Hàm lấy token từ localStorage
+const getAuthToken = (): string | null => {
+  // Hàm này lấy token đã được lưu trong localStorage sau khi người dùng đăng nhập.
+  // Đảm bảo rằng bạn đã lưu token với key là 'accessToken' trong ứng dụng của mình.
+  return localStorage.getItem('accessToken');
 };
 
-// --- Initial freshChatboxStyles without self-referencing typing indicator styles ---
-let freshChatboxStyles: ChatboxStyles = { // Use 'let' to allow modification
-  container: {
-    width: 360,
-    height: 580,
-    position: 'fixed',
-    bottom: '20px',
-    right: '20px',
-    background: '#ffffff',
-    borderRadius: '12px',
-    padding: '0px',
-    boxShadow: '0px 10px 30px rgba(0, 0, 0, 0.1)',
-    display: 'flex',
-    flexDirection: 'column',
-    fontFamily: "'Inter', sans-serif",
-    color: '#333333',
-    zIndex: 1001,
-    overflow: 'hidden',
-  },
-  header: {
-    position: 'relative',
-    textAlign: 'left',
-    fontSize: '18px',
-    fontWeight: '600',
-    padding: '16px 20px',
-    borderBottom: '1px solid #eeeeee',
-    color: '#1a202c',
-    background: '#f7fafc',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '50%',
-    right: '15px',
-    transform: 'translateY(-50%)',
-    background: 'transparent',
-    border: 'none',
-    color: '#718096',
-    fontSize: '22px',
-    cursor: 'pointer',
-    padding: '5px',
-    lineHeight: '1',
-  },
-  messagesContainer: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '15px 20px',
-    background: '#ffffff',
-    scrollbarWidth: 'thin' as 'thin',
-    scrollbarColor: '#00BFA6 #f0f0f0',
-  },
-  messageBubble: (sender) => ({
-    margin: '10px 0',
-    display: 'flex',
-    justifyContent: sender === 'user' ? 'flex-end' : 'flex-start',
-    alignItems: 'flex-end',
-  }),
-  messageText: (sender) => ({
-    display: 'inline-block',
-    background: sender === 'user' ? '#00BFA6' : '#EDF2F7',
-    color: sender === 'user' ? '#ffffff' : '#2D3748',
-    padding: '10px 16px',
-    borderRadius: sender === 'user' ? '20px 20px 4px 20px' : '20px 20px 20px 4px',
-    maxWidth: '80%',
-    wordWrap: 'break-word',
-    overflowWrap: 'break-word',
-    whiteSpace: 'pre-wrap',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-    lineHeight: '1.5',
-  }),
-  botIcon: {
-    marginRight: '10px',
-    fontSize: '24px',
-    color: '#718096',
-    width: '32px',
-    height: '32px',
-    borderRadius: '50%',
-    background: '#EDF2F7',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  inputArea: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 15px',
-    borderTop: '1px solid #eeeeee',
-    background: '#f7fafc',
-  },
-  inputField: {
-    flex: 1,
-    padding: '12px 18px',
-    border: '1px solid #E2E8F0',
-    borderRadius: '25px',
-    outline: 'none',
-    backgroundColor: '#ffffff',
-    color: '#2D3748',
-    marginRight: '10px',
-    fontSize: '14px',
-    transition: 'border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
-  },
-  sendButton: {
-    padding: '0px',
-    width: '44px',
-    height: '44px',
-    border: 'none',
-    borderRadius: '50%',
-    background: '#00BFA6',
-    color: '#fff',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'background-color 0.2s ease',
-  },
-  // typingIndicatorBubble and typingIndicatorDotContainer will be added below
-};
-
-// --- Now, define and add the typing indicator styles ---
-freshChatboxStyles.typingIndicatorBubble = {
-  ...freshChatboxStyles.messageBubble('bot'),
-};
-
-freshChatboxStyles.typingIndicatorDotContainer = {
-  ...freshChatboxStyles.messageText('bot'),
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '12px 16px', // Adjust padding for dots
-  minHeight: '40px', // Ensure consistent height
-};
-// --- End of style modifications ---
-
-
-const GlobalStyles: React.FC = () => (
-  <style>{`
-    .webkit-scrollbar-fresh::-webkit-scrollbar {
-        width: 6px;
-    }
-    .webkit-scrollbar-fresh::-webkit-scrollbar-track {
-        background: #f0f0f0;
-        border-radius: 3px;
-    }
-    .webkit-scrollbar-fresh::-webkit-scrollbar-thumb {
-        background-color: #00BFA6;
-        border-radius: 3px;
-    }
-    .chat-input-field:focus {
-        border-color: #00BFA6 !important;
-        box-shadow: 0 0 0 3px rgba(0, 191, 166, 0.2) !important;
-    }
-    .chat-send-button-fresh:hover {
-        background-color: #00A794 !important;
-    }
-
-    /* Typing Indicator Animation */
-    .typing-dot {
-      width: 8px;
-      height: 8px;
-      margin: 0 3px;
-      background-color: #A0AEC0; /* A neutral dot color */
-      border-radius: 50%;
-      opacity: 0.4;
-      animation: typingAnimation 1.4s infinite ease-in-out;
-    }
-    .typing-dot:nth-child(1) {
-      animation-delay: 0s;
-    }
-    .typing-dot:nth-child(2) {
-      animation-delay: 0.2s;
-    }
-    .typing-dot:nth-child(3) {
-      animation-delay: 0.4s;
-    }
-    @keyframes typingAnimation {
-      0%, 100% {
-        opacity: 0.4;
-        transform: scale(0.85);
-      }
-      40% {
-        opacity: 1;
-        transform: scale(1);
-      }
-    }
-  `}</style>
-);
-
-// Typing Indicator Component
-const TypingIndicator: React.FC = () => {
-  // Ensure styles are available; this check might be redundant if TS ensures freshChatboxStyles is initialized
-  if (!freshChatboxStyles.typingIndicatorBubble || !freshChatboxStyles.typingIndicatorDotContainer) {
-    return null; // Or some fallback UI
-  }
-  return (
-    <div style={freshChatboxStyles.typingIndicatorBubble}>
-      <div style={freshChatboxStyles.botIcon}>
-        <span role="img" aria-label="robot-typing">🤖</span>
-      </div>
-      <div style={freshChatboxStyles.typingIndicatorDotContainer}>
-        <span className="typing-dot"></span>
-        <span className="typing-dot"></span>
-        <span className="typing-dot"></span>
-      </div>
-    </div>
-  );
-};
-
+// --- MAIN COMPONENT ---
 
 const Chatbox: React.FC<ChatboxProps> = ({ onClose }) => {
+  // --- STATE MANAGEMENT ---
+  const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [input, setInput] = useState<string>('');
-  const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false); // Trạng thái để biết đã nạp tài liệu chưa
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  // --- API FUNCTIONS ---
 
-  useEffect(scrollToBottom, [messages, isLoading]);
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-
-    const userMessage: Message = { sender: 'user', text: input };
-    setMessages(prev => [...prev, userMessage]);
-    const currentInput = input;
-    setInput('');
+  // Hàm nạp tài liệu ngữ cảnh
+  const loadContextDocument = async () => {
     setIsLoading(true);
+    setMessages([]); // Xóa tin nhắn cũ khi bắt đầu nạp
+    const token = getAuthToken();
+    if (!token) {
+      setMessages([{ role: 'assistant', content: 'Lỗi: Không tìm thấy token xác thực. Vui lòng đăng nhập lại.' }]);
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      const bearerToken = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwaGFtdHJ1bmd0aW5weTM2M0BnbWFpbC5jb20iLCJpYXQiOjE3NDg1NTQxNzMsImV4cCI6MTc0ODY0MDU3M30.iMpmzg_aK1QobE-M-Pahzkyfgv8BrzxOQQFlN9iUTVU";
-      const modelName = "llama2:7b";
-
-      const requestPayload = {
-        userMessage: currentInput,
-        model: modelName,
-      };
-
-      const response = await axios.post<string>(
-        'http://localhost:8080/api/v1/chat/send',
-        requestPayload,
+      await axios.post(
+        `${API_BASE_URL}/load-from-path`,
+        { path: DOCUMENT_PATH.replace(/\\/g, '/') }, // Gửi đường dẫn đã chuẩn hóa
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${bearerToken}`,
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+      // Thêm tin nhắn chào mừng sau khi nạp thành công
+      setMessages([{ role: 'assistant', content: 'Xin chào! Tôi có thể giúp gì cho bạn về dự án này?' }]);
+      setIsInitialized(true);
+    } catch (error) {
+      console.error("Error loading context document:", error);
+      // Kiểm tra lỗi 401 hoặc 403 để thông báo hết hạn token
+      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+        setMessages([{ role: 'assistant', content: 'Lỗi: Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.' }]);
+      } else {
+        setMessages([{ role: 'assistant', content: 'Lỗi: Không thể nạp tài liệu cho trợ lý AI.' }]);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Hàm xóa ngữ cảnh và reset chat
+  const handleResetChat = async () => {
+    const token = getAuthToken();
+    if (!token) {
+      alert('Lỗi xác thực. Không thể reset.');
+      return;
+    }
+    try {
+      await axios.post(
+        `${API_BASE_URL}/clear-context`,
+        {},
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      // Sau khi xóa thành công, nạp lại tài liệu để bắt đầu phiên mới
+      await loadContextDocument();
+    } catch (error) {
+      console.error("Error resetting chat context:", error);
+      alert('Đã xảy ra lỗi khi cố gắng làm mới cuộc trò chuyện.');
+    }
+  };
+
+
+  // Hàm gửi tin nhắn tới API /conversation
+  const sendMessage = async () => {
+    if (!input.trim() || isLoading) return;
+
+    const newUserMessage: ApiMessage = { role: 'user', content: input };
+    const updatedMessages: ApiMessage[] = [...messages, newUserMessage];
+
+    setMessages(updatedMessages);
+    setInput('');
+    setIsLoading(true);
+
+    const token = getAuthToken();
+    if (!token) {
+      setMessages([...updatedMessages, { role: 'assistant', content: 'Lỗi: Không tìm thấy token xác thực. Vui lòng đăng nhập lại.' }]);
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await axios.post<string>(
+        `${API_BASE_URL}/conversation`,
+        {
+          model: 'mistral', // Hoặc model mặc định của bạn
+          messages: updatedMessages, // Gửi toàn bộ lịch sử chat
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
         }
       );
 
-      let botReplyText: string;
-      if (typeof response.data === 'string') {
-        botReplyText = response.data;
-      } else {
-        botReplyText = "Sorry, I received an unexpected response format.";
-        console.error("Unexpected API response format:", response.data);
-      }
-
-      const botReply: Message = { sender: 'bot', text: botReplyText };
+      const botReply: ApiMessage = { role: 'assistant', content: response.data };
       setMessages(prev => [...prev, botReply]);
 
     } catch (error) {
       console.error("Error sending message:", error);
-      let errorMessageText = "Sorry, the AI assistant is currently unavailable. Please try again later.";
-
-      if (axios.isAxiosError(error)) {
-        if (error.response) {
-          if (typeof error.response.data === 'string' && error.response.data.length < 200) {
-            errorMessageText = `Error: ${error.response.data}`;
-          } else {
-            errorMessageText = `Error: Could not connect to the AI assistant (Status: ${error.response.status}).`;
-          }
-        } else if (error.request) {
-          errorMessageText = "Error: No response from the AI assistant. Please check your connection.";
-        }
+      // Kiểm tra lỗi 401 hoặc 403 để thông báo hết hạn token
+      let errorMessageContent = 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.';
+      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+        errorMessageContent = 'Lỗi: Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
       }
-
-      const errorMessage: Message = { sender: 'bot', text: errorMessageText };
+      const errorMessage: ApiMessage = { role: 'assistant', content: errorMessageContent };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(event.target.value);
-  };
+  // --- EFFECTS ---
 
-  const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
+  // Tự động nạp tài liệu khi component được mở lần đầu
+  useEffect(() => {
+    if (!isInitialized) {
+      loadContextDocument();
+    }
+  }, [isInitialized]); // Chỉ chạy một lần
+
+  // Tự động cuộn xuống tin nhắn mới nhất
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, isLoading]);
+
+  // --- EVENT HANDLERS ---
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value);
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !isLoading) {
+      e.preventDefault();
       sendMessage();
     }
   };
 
+  // --- RENDER ---
   return (
-    <>
-      <GlobalStyles />
-      <div style={freshChatboxStyles.container}>
-        <div style={freshChatboxStyles.header}>
-          <span role="img" aria-label="chat-icon" style={{ marginRight: '10px', fontSize: '22px', color: '#00BFA6' }}>💬</span>
-          AI Assistant
-          <button
-            onClick={onClose}
-            style={freshChatboxStyles.closeButton}
-            aria-label="Close chat"
-          >
-            ✕
-          </button>
-        </div>
-        <div style={freshChatboxStyles.messagesContainer} className="webkit-scrollbar-fresh">
-          {messages.map((msg, index) => (
-            <div key={index} style={freshChatboxStyles.messageBubble(msg.sender)}>
-              {msg.sender === 'bot' && (
-                <div style={freshChatboxStyles.botIcon}>
-                  <span role="img" aria-label="robot">🤖</span>
-                </div>
-              )}
-              <div style={freshChatboxStyles.messageText(msg.sender)}>
-                {msg.text}
-              </div>
-            </div>
-          ))}
-          {isLoading && <TypingIndicator />}
-          <div ref={messagesEndRef} />
-        </div>
-        <div style={freshChatboxStyles.inputArea}>
-          <input
-            type="text"
-            value={input}
-            onChange={handleInputChange}
-            onKeyPress={handleKeyPress}
-            style={freshChatboxStyles.inputField}
-            className="chat-input-field"
-            placeholder="Type a message..."
-            disabled={isLoading}
-          />
-          <button
-            onClick={sendMessage}
-            style={freshChatboxStyles.sendButton}
-            className="chat-send-button-fresh"
-            aria-label="Send message"
-            disabled={isLoading}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
-        </div>
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <span style={styles.headerTitle}>AI Assistant</span>
+        <button onClick={handleResetChat} style={styles.resetButton} title="Bắt đầu cuộc trò chuyện mới">
+          <FiRefreshCw size={16} />
+        </button>
+        <button onClick={onClose} style={styles.closeButton} title="Đóng chat">
+          ✕
+        </button>
       </div>
-    </>
+
+      <div style={styles.messagesContainer}>
+        {messages.map((msg, index) => (
+          <div key={index} style={styles.messageBubble(msg.role)}>
+            {msg.role === 'assistant' && <div style={styles.botIcon}>🤖</div>}
+            <div style={styles.messageText(msg.role)}>{msg.content}</div>
+          </div>
+        ))}
+        {isLoading && <TypingIndicator />}
+        <div ref={messagesEndRef} />
+      </div>
+
+      <div style={styles.inputArea}>
+        <input
+          type="text"
+          value={input}
+          onChange={handleInputChange}
+          onKeyPress={handleKeyPress}
+          placeholder="Hỏi tôi về dự án..."
+          style={styles.inputField}
+          disabled={isLoading}
+        />
+        <button
+          onClick={sendMessage}
+          style={styles.sendButton}
+          disabled={isLoading}
+        >
+          <FiSend size={20} />
+        </button>
+      </div>
+    </div>
   );
 };
+
+// --- STYLED COMPONENTS & SUB-COMPONENTS ---
+const TypingIndicator: React.FC = () => (
+  <div style={styles.messageBubble('assistant')}>
+    <div style={styles.botIcon}>🤖</div>
+    <div style={{ ...styles.messageText('assistant'), display: 'flex' }}>
+      <span style={styles.typingDot(0)}></span>
+      <span style={styles.typingDot(0.2)}></span>
+      <span style={styles.typingDot(0.4)}></span>
+    </div>
+  </div>
+);
+
+
+// Di chuyển styles vào trong component để dễ quản lý
+const styles = {
+  container: {
+    width: 370, height: 600, position: 'fixed', bottom: 20, right: 20,
+    background: '#fff', borderRadius: 12, boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+    display: 'flex', flexDirection: 'column', fontFamily: 'Inter, sans-serif', zIndex: 1001
+  } as React.CSSProperties,
+  header: {
+    display: 'flex', alignItems: 'center', padding: '16px 20px',
+    borderBottom: '1px solid #e5e7eb', background: '#f9fafb', position: 'relative'
+  } as React.CSSProperties,
+  headerTitle: {
+    fontWeight: 600, fontSize: 18, color: '#111827', flexGrow: 1
+  } as React.CSSProperties,
+  resetButton: {
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    color: '#6b7280', padding: 5, marginRight: 10,
+    display: 'flex', alignItems: 'center', justifyContent: 'center'
+  } as React.CSSProperties,
+  closeButton: {
+    background: 'transparent', border: 'none', cursor: 'pointer',
+    color: '#6b7280', fontSize: 20, padding: 5
+  } as React.CSSProperties,
+  messagesContainer: {
+    flex: 1, overflowY: 'auto', padding: '15px'
+  } as React.CSSProperties,
+  messageBubble: (role: 'user' | 'assistant') => ({
+    display: 'flex', alignItems: 'flex-end', margin: '10px 0',
+    justifyContent: role === 'user' ? 'flex-end' : 'flex-start',
+  }) as React.CSSProperties,
+  botIcon: {
+    width: 32, height: 32, borderRadius: '50%', background: '#e5e7eb',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    marginRight: 10, fontSize: 20
+  } as React.CSSProperties,
+  messageText: (role: 'user' | 'assistant') => ({
+    padding: '10px 16px', borderRadius: 18, maxWidth: '80%',
+    background: role === 'user' ? '#3b82f6' : '#f3f4f6',
+    color: role === 'user' ? '#fff' : '#1f2937',
+    lineHeight: 1.5, wordWrap: 'break-word'
+  }) as React.CSSProperties,
+  inputArea: {
+    display: 'flex', alignItems: 'center', padding: '10px 15px',
+    borderTop: '1px solid #e5e7eb'
+  } as React.CSSProperties,
+  inputField: {
+    flex: 1, padding: '10px 16px', border: '1px solid #d1d5db',
+    borderRadius: 20, outline: 'none', marginRight: 10
+  } as React.CSSProperties,
+  sendButton: {
+    width: 40, height: 40, borderRadius: '50%', background: '#3b82f6',
+    color: '#fff', border: 'none', cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center'
+  } as React.CSSProperties,
+  typingDot: (delay: number) => ({
+    width: 8, height: 8, margin: '0 2px', background: '#9ca3af',
+    borderRadius: '50%',
+    animation: `typingAnimation 1.4s infinite ease-in-out ${delay}s`
+  }) as React.CSSProperties,
+};
+
+// Thêm keyframes vào document để không bị lỗi inline style
+const keyframes = `
+@keyframes typingAnimation {
+  0%, 100% { opacity: 0.4; transform: scale(0.85); }
+  40% { opacity: 1; transform: scale(1); }
+}`;
+
+// Chỉ thêm stylesheet một lần để tránh trùng lặp
+if (!document.getElementById('chatbox-keyframes')) {
+  const styleSheet = document.createElement("style");
+  styleSheet.id = 'chatbox-keyframes';
+  styleSheet.innerText = keyframes;
+  document.head.appendChild(styleSheet);
+}
+
 
 export default Chatbox;

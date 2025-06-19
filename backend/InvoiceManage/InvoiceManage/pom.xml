@@ -121,6 +121,11 @@
 			<scope>runtime</scope> <!-- This one is typically needed at runtime for the implementation -->
 		</dependency>
 		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>5.2.5</version> <!-- Hoặc phiên bản mới nhất -->
+		</dependency>
+		<dependency>
 			<groupId>io.jsonwebtoken</groupId>
 			<artifactId>jjwt-jackson</artifactId> <!-- For Jackson JSON processing -->
 			<version>0.11.5</version>

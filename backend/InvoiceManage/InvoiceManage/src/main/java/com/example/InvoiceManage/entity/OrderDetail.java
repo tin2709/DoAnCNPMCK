@@ -50,4 +50,12 @@ public class OrderDetail {
             this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
         }
     }
+    public OrderDetail(Order order, Product product, Integer quantity, BigDecimal price) {
+        this.order = order;
+        this.product = product;
+        this.quantity = quantity;
+        this.price = price;
+        calculateSubtotal(); // Gọi hàm tính subtotal ngay khi khởi tạo
+    }
+
 }

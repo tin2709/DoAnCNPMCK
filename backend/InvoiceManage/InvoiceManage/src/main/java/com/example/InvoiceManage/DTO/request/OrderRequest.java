@@ -13,14 +13,13 @@ import lombok.RequiredArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class OrderRequest {
-    private String picture;
-    private String tokenOrder;
     private BigDecimal total;
-    private Integer userId;
     private int idStatus;
+    private List<Integer> proList;
 }

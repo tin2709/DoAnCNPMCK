@@ -14,7 +14,8 @@ public class SecurityConstants {
             API_PREFIX + "/v3/api-docs/**",
             API_PREFIX + "/webjars/**",
             API_PREFIX + "/favicon.ico",
-            API_PREFIX+"/vnpay/IPN"
+            API_PREFIX+"/vnpay/IPN",
+            API_PREFIX+"/invoice-requests/**"
     };
 
     // Other security constants if any

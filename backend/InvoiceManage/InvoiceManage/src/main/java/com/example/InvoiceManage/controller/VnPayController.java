@@ -32,8 +32,6 @@ public class VnPayController {
     @GetMapping("/IPN")
     public ResponseEntity<Void> ipn(@RequestParam Map<String, String> params) {
         vnPaySerivce.ipn(params);
-
-
         return null;
     }
 }

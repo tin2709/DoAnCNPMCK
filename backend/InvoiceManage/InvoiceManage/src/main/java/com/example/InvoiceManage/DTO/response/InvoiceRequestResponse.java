@@ -8,7 +8,7 @@ import lombok.Data;
 public class InvoiceRequestResponse {
     private Long id;
     private Long orderId;
-    private Long userId;
+    private String username;
     private String createdAt;
     private String statusName;
 }

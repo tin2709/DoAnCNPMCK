@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findByDateBetween(Instant startDate,Instant endDate);
+    List<Order> findByCreatedById(Integer userId);
 }

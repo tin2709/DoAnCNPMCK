@@ -30,7 +30,7 @@ public class InvoiceRequestService {
                 .map(req -> InvoiceRequestPendingDTO.builder()
                         .id(req.getId())
                         .userName(req.getUser().getName())
-                        .tokenOrder(req.getOrder().getTokenOrder())
+//                        .tokenOrder(req.getOrder().getTokenOrder())
                         .createdAt(req.getCreatedAt())
                         .build()
                 ).collect(Collectors.toList());

@@ -1,20 +1,20 @@
 // src/pages/User/HomePage.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import Swal from 'sweetalert2';
 
-// Import react-icons
+// Import react-icons (giữ nguyên)
 import {
   FiChevronDown, FiLogOut, FiBox, FiInfo, FiBarChart2,
   FiPhone, FiCalendar, FiUser, FiMail, FiFileText, FiDollarSign
 } from 'react-icons/fi';
 
-// Animation libraries
+// Animation libraries (giữ nguyên)
 import { OverPack } from 'rc-scroll-anim';
 import QueueAnim from 'rc-queue-anim';
 
-// --- INTERFACES (ĐÃ SỬA LẠI THEO PATTERN DISCRIMINATED UNIONS) ---
-
-// Kiểu dữ liệu cho người dùng đăng nhập
+// --- INTERFACES (giữ nguyên từ câu trả lời trước) ---
 interface LoggedInUser {
   id: number;
   email: string;
@@ -23,24 +23,30 @@ interface LoggedInUser {
   accessToken: string;
 }
 
-// Kiểu cho một mục menu thông thường
+interface Order {
+  id: number;
+  total: number;
+  statusName: string;
+  date: string;
+  orderDetails: any[];
+  createdBy: any;
+}
+
 interface RegularMenuItem {
-  type: 'menu'; // Discriminant
+  type: 'menu';
   key: string;
   icon: React.ReactElement;
   label: string;
   onClick: () => void;
 }
 
-// Kiểu cho dải phân cách
 interface DividerMenuItem {
-  type: 'divider'; // Discriminant
+  type: 'divider';
   key: string;
 }
 
-// Kiểu cho nút logout
 interface LogoutMenuItem {
-  type: 'logout'; // Discriminant
+  type: 'logout';
   key: string;
   icon: React.ReactElement;
   label: string;
@@ -48,10 +54,8 @@ interface LogoutMenuItem {
   danger: boolean;
 }
 
-// Union Type: Một mục trong dropdown có thể là một trong ba loại trên
 type DropdownItem = RegularMenuItem | DividerMenuItem | LogoutMenuItem;
 
-// Kiểu cho form liên hệ
 interface FormState {
   name: string;
   email: string;
@@ -73,6 +77,82 @@ const HomePage: React.FC = () => {
     }
   }, [navigate]);
 
+  // --- useEffect MỚI ĐỂ KIỂM TRA VÀ HIỂN THỊ THÔNG BÁO ĐƠN HÀNG ---
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    const notificationShown = sessionStorage.getItem('homePageNotificationShown');
+    if (notificationShown === 'true') {
+      return;
+    }
+
+    const checkOrderNotifications = async () => {
+      try {
+        const response = await axios.get<Order[]>(
+          `http://localhost:8080/api/orders/user/${currentUser.id}`,
+          {
+            headers: { Authorization: `Bearer ${currentUser.accessToken}` }
+          }
+        );
+        const orders = response.data;
+
+        // BƯỚC 1: LỌC RIÊNG TỪNG LOẠI TRẠNG THÁI
+        const rejectedOrders = orders.filter(order => order.statusName === 'Từ chối');
+        const awaitingPaymentOrders = orders.filter(order => order.statusName === 'Chờ thanh toán');
+
+        // BƯỚC 2: KIỂM TRA XEM CÓ GÌ ĐỂ THÔNG BÁO KHÔNG
+        if (rejectedOrders.length === 0 && awaitingPaymentOrders.length === 0) {
+          sessionStorage.setItem('homePageNotificationShown', 'true');
+          return; // Không có gì để thông báo, thoát và đánh dấu
+        }
+
+        // BƯỚC 3: XÂY DỰNG NỘI DUNG THÔNG BÁO ĐỘNG
+        let notificationHtml = '';
+        if (rejectedOrders.length > 0) {
+          notificationHtml += `<div class="text-left mb-2"><strong>Đơn hàng bị từ chối:</strong> ĐH #${rejectedOrders.map(o => o.id).join(', #')}</div>`;
+        }
+        if (awaitingPaymentOrders.length > 0) {
+          notificationHtml += `<div class="text-left"><strong>Đơn hàng chờ thanh toán:</strong> ĐH #${awaitingPaymentOrders.map(o => o.id).join(', #')}</div>`;
+        }
+
+        const finalHtml = `
+            ${notificationHtml}
+            <br>
+            Hãy kiểm tra trang <a href="/orders" class="font-bold text-blue-600 hover:underline">Lịch sử Đơn hàng</a>.
+        `;
+
+        // BƯỚC 4: HIỂN THỊ TOAST VỚI NỘI DUNG CHI TIẾT
+        Swal.fire({
+          toast: true,
+          position: 'top-end',
+          icon: 'warning', // Dùng icon warning sẽ phù hợp hơn
+          iconColor: '#f59e0b', // Màu vàng
+          title: `Bạn có thông báo mới về đơn hàng!`,
+          html: finalHtml,
+          showConfirmButton: false,
+          timer: 7000, // Tăng thời gian hiển thị lên một chút
+          timerProgressBar: true,
+          didOpen: (toast) => {
+            toast.onmouseenter = Swal.stopTimer;
+            toast.onmouseleave = Swal.resumeTimer;
+          }
+        });
+
+      } catch (error) {
+        console.error("Lỗi khi kiểm tra thông báo đơn hàng:", error);
+      } finally {
+        sessionStorage.setItem('homePageNotificationShown', 'true');
+      }
+    };
+
+    checkOrderNotifications();
+
+  }, [currentUser]);
+
+
+  // --- CÁC STATE VÀ LOGIC KHÁC GIỮ NGUYÊN ---
   const [renderBelowFold, setRenderBelowFold] = useState<boolean>(false);
   const [isManagementDropdownOpen, setIsManagementDropdownOpen] = useState<boolean>(false);
   const [contactForm, setContactForm] = useState<FormState>({ name: '', email: '', message: '' });
@@ -97,16 +177,18 @@ const HomePage: React.FC = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('userLoginInfo');
-    alert("Đăng xuất thành công!");
+    Swal.fire({
+      icon: 'success',
+      title: 'Đăng xuất thành công!',
+      showConfirmButton: false,
+      timer: 1500
+    });
     navigate("/login", { replace: true });
   };
 
-  // --- ĐỊNH NGHĨA MENU "MANAGEMENT" (SỬ DỤNG CÁC KIỂU MỚI) ---
-
-  // Mảng này bây giờ có kiểu là RegularMenuItem[]
   const managementMenuItems: RegularMenuItem[] = [
     {
-      type: 'menu', // <-- THÊM THUỘC TÍNH 'type'
+      type: 'menu',
       key: 'products',
       icon: <FiBox />,
       label: 'Sản phẩm',
@@ -116,9 +198,9 @@ const HomePage: React.FC = () => {
       }
     },
     {
-      type: 'menu', // <-- THÊM THUỘC TÍNH 'type'
-      key: 'products',
-      icon: <FiBox />,
+      type: 'menu',
+      key: 'orders',
+      icon: <FiFileText />,
       label: 'Hóa đơn',
       onClick: () => {
         navigate('/orders');
@@ -127,12 +209,11 @@ const HomePage: React.FC = () => {
     }
   ];
 
-  // Mảng cuối cùng có kiểu là DropdownItem[]
   const managementDropdownItems: DropdownItem[] = [
     ...managementMenuItems,
-    { type: 'divider', key: 'divider-logout' }, // <-- Đã có 'type'
+    { type: 'divider', key: 'divider-logout' },
     {
-      type: 'logout', // <-- THÊM THUỘC TÍNH 'type'
+      type: 'logout',
       key: 'logout',
       icon: <FiLogOut />,
       label: 'Logout',
@@ -148,15 +229,15 @@ const HomePage: React.FC = () => {
   const onContactFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!contactForm.name || !contactForm.email || !contactForm.message) {
-      alert("Vui lòng điền đầy đủ thông tin!");
+      Swal.fire('Lỗi', 'Vui lòng điền đầy đủ thông tin!', 'error');
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactForm.email)) {
-      alert("Vui lòng nhập địa chỉ email hợp lệ!");
+      Swal.fire('Lỗi', 'Vui lòng nhập địa chỉ email hợp lệ!', 'error');
       return;
     }
     setTimeout(() => {
-      alert("Tin nhắn của bạn đã được gửi thành công!");
+      Swal.fire('Thành công', 'Tin nhắn của bạn đã được gửi!', 'success');
       setContactForm({ name: '', email: '', message: '' });
       formRef.current?.reset();
     }, 500);
@@ -168,6 +249,7 @@ const HomePage: React.FC = () => {
     return <div className="flex items-center justify-center min-h-screen">Đang xác thực...</div>;
   }
 
+  // --- PHẦN GIAO DIỆN JSX (GIỮ NGUYÊN) ---
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       {/* Header */}
@@ -188,21 +270,15 @@ const HomePage: React.FC = () => {
             </button>
             {isManagementDropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg z-20 overflow-hidden">
-                {/* PHẦN RENDER ĐÃ SỬA LẠI ĐỂ AN TOÀN VỀ KIỂU */}
                 {managementDropdownItems.map(item => {
-                  // Bây giờ TypeScript sẽ không báo lỗi nữa vì nó biết `type` luôn tồn tại
                   if (item.type === 'divider') {
                     return <hr key={item.key} className="border-t border-gray-200 my-1" />;
                   }
-
-                  // Trong khối else này, TypeScript biết `item` là `RegularMenuItem` hoặc `LogoutMenuItem`.
-                  // Cả hai đều có onClick, icon, label, key.
                   return (
                     <button
                       key={item.key}
                       onClick={item.onClick}
                       className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 ${
-                        // Chúng ta có thể kiểm tra `item.type` để xác định class an toàn
                         item.type === 'logout' && item.danger ? 'text-red-600' : ''
                       }`}
                     >

@@ -1,32 +1,34 @@
-import { HiOutlineUserGroup } from 'react-icons/hi';
-import { FiHome, FiUsers, FiPackage, FiSettings, FiLogOut } from 'react-icons/fi'; // Import FiLogOut
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { HiOutlineUserGroup } from 'react-icons/hi'
+import { FiHome, FiUsers, FiPackage, FiSettings, FiLogOut } from 'react-icons/fi' // Import FiLogOut
+import { useNavigate } from 'react-router-dom' // Import useNavigate
 
 interface Props {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-  activeView: string;
-  setActiveView: (view: string) => void;
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
+  activeView: string
+  setActiveView: (view: string) => void
 }
 
 export default function Sidebar({ sidebarOpen, setSidebarOpen, activeView, setActiveView }: Props) {
-  const navigate = useNavigate(); // Khởi tạo useNavigate
+  const navigate = useNavigate() // Khởi tạo useNavigate
 
   const handleLogout = () => {
     // Xóa tất cả thông tin liên quan đến đăng nhập khỏi localStorage
-    localStorage.removeItem('userLoginInfo');
-    localStorage.removeItem('accessToken');
+    localStorage.removeItem('userLoginInfo')
+    localStorage.removeItem('accessToken')
     // Có thể thêm các thao tác dọn dẹp khác nếu cần (ví dụ: xóa trạng thái người dùng trong Redux/Context)
 
     // Chuyển hướng người dùng về trang đăng nhập
-    navigate('/login');
-  };
+    navigate('/login')
+  }
 
   return (
     <aside
       className={`${sidebarOpen ? 'w-64' : 'w-20'} transition-width duration-300 bg-white dark:bg-gray-800 shadow-lg flex flex-col justify-between`} // Thêm flex-col justify-between để nút logout nằm ở cuối
     >
-      <div className='p-4 flex-grow'> {/* Thêm flex-grow để nội dung chính chiếm không gian */}
+      <div className='p-4 flex-grow'>
+        {' '}
+        {/* Thêm flex-grow để nội dung chính chiếm không gian */}
         <div className='flex items-center justify-between'>
           <h2 className={`${sidebarOpen ? 'block' : 'hidden'} text-xl font-bold text-gray-800 dark:text-white`}>
             Admin Panel
@@ -95,6 +97,33 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, activeView, setAc
             )}
           </button>
           <button
+            onClick={() => setActiveView('invoiceRequests')}
+            className={`flex items-center w-full p-3 rounded-lg ${
+              activeView === 'invoiceRequests'
+                ? 'bg-blue-100 dark:bg-blue-900'
+                : 'hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+          >
+            <FiPackage
+              className={`w-6 h-6 ${
+                activeView === 'invoiceRequests'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+            />
+            {sidebarOpen && (
+              <span
+                className={`ml-3 ${
+                  activeView === 'invoiceRequests'
+                    ? 'text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                Invoice Requests
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveView('settings')} // Thêm onClick cho Settings nếu bạn muốn nó cũng là một view
             className={`flex items-center w-full p-3 rounded-lg ${
               activeView === 'settings' ? 'bg-blue-100 dark:bg-blue-900' : 'hover:bg-gray-200 dark:hover:bg-gray-700'
@@ -121,5 +150,5 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, activeView, setAc
         </button>
       </div>
     </aside>
-  );
+  )
 }

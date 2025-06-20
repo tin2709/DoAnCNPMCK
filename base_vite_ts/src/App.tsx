@@ -1,11 +1,12 @@
 import './App.css'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import AdminDashboard from './pages/AdminDashboard'
-import Login from './pages/login'
-import Register from './pages/register'
-import HomePage from './pages/User/HomePage.tsx'
-import InvoiceRequestPage from './pages/InvoiceRequest'
 
+import InvoiceRequestPage from './pages/InvoiceRequest'
+import Login from "./pages/login";
+import Register from "./pages/register";
+import HomePage from "./pages/User/HomePage.tsx";
+import ProductManagermentPage from "./pages/User/ProductManagement.tsx";
 function App() {
   return (
     <Router>
@@ -13,6 +14,7 @@ function App() {
         <Route path='/' element={<Navigate to='/login' replace />} />
 
         <Route path='/user' element={<HomePage />} />
+        <Route path='/products' element={<ProductManagermentPage />} />
         <Route path='/admin' element={<AdminDashboard />} />
         <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />

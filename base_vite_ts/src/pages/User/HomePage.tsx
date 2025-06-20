@@ -1,227 +1,133 @@
-// src/components/Home/HomePage.tsx
+// src/pages/User/HomePage.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // Import react-icons
 import {
-  FiChevronDown, FiLogOut, FiDollarSign, FiUsers, FiBox,
-  FiFileText, FiSettings, FiMail, FiUser, FiInfo, FiBarChart2,
-  FiPhone, FiCalendar, FiLoader
+  FiChevronDown, FiLogOut, FiBox, FiInfo, FiBarChart2,
+  FiPhone, FiCalendar, FiUser, FiMail, FiFileText, FiDollarSign
 } from 'react-icons/fi';
 
 // Animation libraries
 import { OverPack } from 'rc-scroll-anim';
 import QueueAnim from 'rc-queue-anim';
 
-// REMOVED: const API_BASE_URL = "https://localhost:8080"; // No longer needed as we're removing API calls
+// --- INTERFACES (ĐÃ SỬA LẠI THEO PATTERN DISCRIMINATED UNIONS) ---
 
-// REMOVED: UserPermission interface is not strictly needed if we're not fetching permissions
-// interface UserPermission {
-//   resource: string;
-//   action: string;
-// }
-
-interface FormState {
-  name: string;
+// Kiểu dữ liệu cho người dùng đăng nhập
+interface LoggedInUser {
+  id: number;
   email: string;
-  message: string;
+  name: string;
+  role: { id: number; roleName: string; };
+  accessToken: string;
 }
 
-// --- INTERFACES FOR DROPDOWN ITEMS (kept for type safety in UI) ---
-interface BaseMenuItem {
+// Kiểu cho một mục menu thông thường
+interface RegularMenuItem {
+  type: 'menu'; // Discriminant
   key: string;
   icon: React.ReactElement;
   label: string;
   onClick: () => void;
 }
 
-interface RegularMenuItem extends BaseMenuItem {
-  type: 'menu'; // Discriminant property
-  resource?: string; // Optional for filtering logic (still relevant for static role checks)
-  requiredAction?: string; // Optional for filtering logic (still relevant for static role checks)
-}
-
+// Kiểu cho dải phân cách
 interface DividerMenuItem {
+  type: 'divider'; // Discriminant
   key: string;
-  type: 'divider'; // Discriminant property
 }
 
-interface LogoutMenuItem extends BaseMenuItem {
-  type: 'logout'; // Discriminant property
-  danger: boolean; // Specific property for logout item
+// Kiểu cho nút logout
+interface LogoutMenuItem {
+  type: 'logout'; // Discriminant
+  key: string;
+  icon: React.ReactElement;
+  label: string;
+  onClick: () => void;
+  danger: boolean;
 }
 
-// Union type for all possible dropdown items
-type ManagementDropdownItem = RegularMenuItem | DividerMenuItem | LogoutMenuItem;
-// --- END INTERFACES ---
+// Union Type: Một mục trong dropdown có thể là một trong ba loại trên
+type DropdownItem = RegularMenuItem | DividerMenuItem | LogoutMenuItem;
 
+// Kiểu cho form liên hệ
+interface FormState {
+  name: string;
+  email: string;
+  message: string;
+}
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(null);
 
-  const username = localStorage.getItem("username") || 'User';
-  const rawUserRole = localStorage.getItem("userRole"); // "1": Admin, "2": Accountant, "3": Sales Rep
-  const maTK = localStorage.getItem("maTK");
-  const accessToken = localStorage.getItem("accessToken"); // Using accessToken consistently
+  useEffect(() => {
+    const userLoginInfoString = localStorage.getItem('userLoginInfo');
+    if (userLoginInfoString) {
+      const userData: LoggedInUser = JSON.parse(userLoginInfoString);
+      setCurrentUser(userData);
+    } else {
+      console.error("Không tìm thấy thông tin đăng nhập. Đang chuyển hướng...");
+      navigate('/login');
+    }
+  }, [navigate]);
 
   const [renderBelowFold, setRenderBelowFold] = useState<boolean>(false);
-  // REMOVED: userPermissions state as it's no longer fetched dynamically
-  const [permissionsLoading, setPermissionsLoading] = useState<boolean>(false); // Always false, no API call
-
-  // Dropdown state for management
   const [isManagementDropdownOpen, setIsManagementDropdownOpen] = useState<boolean>(false);
-
-  // Contact form state
   const [contactForm, setContactForm] = useState<FormState>({ name: '', email: '', message: '' });
-  const formRef = useRef<HTMLFormElement>(null); // Ref for form reset
+  const formRef = useRef<HTMLFormElement>(null);
 
-  // Effect for delayed rendering
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setRenderBelowFold(true);
-    }, 150);
+    const timer = setTimeout(() => { setRenderBelowFold(true); }, 150);
     return () => clearTimeout(timer);
   }, []);
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (isManagementDropdownOpen && !(event.target as HTMLElement).closest('.management-dropdown-wrapper')) {
         setIsManagementDropdownOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isManagementDropdownOpen]);
 
-
-  // --- Simplified Effect for initial authentication check (NO API CALLS HERE) ---
-  useEffect(() => {
-    // This effect now only checks for basic client-side authentication tokens
-    // and redirects if they are missing. It does NOT make any API calls.
-    if (!accessToken) {
-      console.error("Missing maTK or accessToken in localStorage. Redirecting to login.");
-      alert("Your session is invalid. Please log in again.");
-      navigate('/login');
-      // We set permissionsLoading to false immediately as there's no fetch happening.
-      setPermissionsLoading(false);
-      return;
-    }
-
-    // Since we are not fetching permissions, and rely solely on rawUserRole
-    // for menu filtering, we can set permissionsLoading to false directly.
-    setPermissionsLoading(false);
-
-  }, [maTK, accessToken, navigate]); // Dependencies reflect what's used in this simplified effect
-
-  let greetingMessage = `Hello, ${username}!`;
-  if (rawUserRole === "2") {
-    greetingMessage = `Accountant, ${username}`;
-  } else if (rawUserRole === "3") {
-    greetingMessage = `Sales Rep, ${username}`;
-  } else if (rawUserRole === "1") {
-    greetingMessage = `Admin, ${username}`;
-  }
+  const greetingMessage = `Hello, ${currentUser?.name || 'User'}!`;
 
   const handleLogout = () => {
-    // This is a client-side logout, no API call involved directly here.
-    localStorage.removeItem('authToken'); // Keep original authToken if used for login
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('maTK');
-    localStorage.removeItem('username');
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('loginSuccessTimestamp');
-    localStorage.removeItem('expireAt');
-    localStorage.removeItem('accessToken'); // Clear accessToken too
-
-    alert("Logged out successfully!");
-    window.location.href = "/login";
+    localStorage.removeItem('userLoginInfo');
+    alert("Đăng xuất thành công!");
+    navigate("/login", { replace: true });
   };
 
-  // Define ALL potential menu items with their required resource and action for Invoice Management
-  // 'resource' and 'requiredAction' are kept here for the static role-based filtering logic.
-  const rawMenuItems: Omit<RegularMenuItem, 'onClick'>[] = [
+  // --- ĐỊNH NGHĨA MENU "MANAGEMENT" (SỬ DỤNG CÁC KIỂU MỚI) ---
+
+  // Mảng này bây giờ có kiểu là RegularMenuItem[]
+  const managementMenuItems: RegularMenuItem[] = [
     {
-      key: '/invoices',
-      icon: <FiFileText />,
-      label: 'Manage Invoices',
-      resource: 'INVOICE',
-      requiredAction: 'VIEW',
-      type: 'menu',
-    },
-    {
-      key: '/customers',
-      icon: <FiUsers />,
-      label: 'Manage Customers',
-      resource: 'CUSTOMER',
-      requiredAction: 'VIEW',
-      type: 'menu',
-    },
-    {
-      key: '/products',
+      type: 'menu', // <-- THÊM THUỘC TÍNH 'type'
+      key: 'products',
       icon: <FiBox />,
-      label: 'Manage Products',
-      resource: 'PRODUCT',
-      requiredAction: 'VIEW',
-      type: 'menu',
-    },
-    {
-      key: '/reports',
-      icon: <FiBarChart2 />,
-      label: 'View Reports',
-      resource: 'REPORT',
-      requiredAction: 'VIEW',
-      type: 'menu',
-    },
-    {
-      key: '/settings',
-      icon: <FiSettings />,
-      label: 'System Settings',
-      resource: 'SETTINGS',
-      requiredAction: 'VIEW',
-      type: 'menu',
-    },
+      label: 'Sản phẩm',
+      onClick: () => {
+        navigate('/products');
+        setIsManagementDropdownOpen(false);
+      },
+    }
   ];
 
-  // Menu filtering is now purely based on rawUserRole, not fetched permissions.
-  const filteredMenuItems: RegularMenuItem[] = rawMenuItems.filter(item => {
-    if (rawUserRole === "1") { // Admin sees all management items
-      return true;
-    } else if (rawUserRole === "2") { // Accountant: Invoices, Customers, Reports
-      return ['/invoices', '/customers', '/reports'].includes(item.key);
-    } else if (rawUserRole === "3") { // Sales Rep: Invoices, Customers, Products
-      return ['/invoices', '/customers', '/products'].includes(item.key);
-    } else {
-      // For any other role, or if rawUserRole is null/undefined,
-      // no management items are shown by default.
-      // You might customize this to show a default set or none.
-      // Currently, it will show nothing unless explicitly listed above.
-      return false;
-    }
-  }).map(item => ({
-    key: item.key,
-    icon: item.icon,
-    label: item.label,
-    onClick: () => {
-      navigate(item.key);
-      setIsManagementDropdownOpen(false);
-    },
-    type: 'menu',
-  }));
-
-  const managementDropdownItems: ManagementDropdownItem[] = [
-    ...filteredMenuItems,
-    { type: 'divider', key: 'divider-logout' },
+  // Mảng cuối cùng có kiểu là DropdownItem[]
+  const managementDropdownItems: DropdownItem[] = [
+    ...managementMenuItems,
+    { type: 'divider', key: 'divider-logout' }, // <-- Đã có 'type'
     {
+      type: 'logout', // <-- THÊM THUỘC TÍNH 'type'
       key: 'logout',
       icon: <FiLogOut />,
       label: 'Logout',
-      danger: true,
       onClick: handleLogout,
-      type: 'logout',
+      danger: true,
     },
   ];
 
@@ -231,33 +137,26 @@ const HomePage: React.FC = () => {
 
   const onContactFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('Contact form submitted: ', contactForm);
-
     if (!contactForm.name || !contactForm.email || !contactForm.message) {
-      alert("Please fill in all required fields!");
+      alert("Vui lòng điền đầy đủ thông tin!");
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactForm.email)) {
-      alert("Please enter a valid email address!");
+      alert("Vui lòng nhập địa chỉ email hợp lệ!");
       return;
     }
-
-    // This is a client-side simulation, no actual API call.
     setTimeout(() => {
-      alert("Your message has been sent successfully!");
+      alert("Tin nhắn của bạn đã được gửi thành công!");
       setContactForm({ name: '', email: '', message: '' });
-      if (formRef.current) {
-        formRef.current.reset();
-      }
+      formRef.current?.reset();
     }, 500);
   };
 
   const aboutUsImageUrl = "https://images.unsplash.com/photo-1579621970795-87facc2f976d?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
 
-  // isManagementDropdownDisabled will now only be true if rawUserRole is not 1, 2, or 3.
-  // Since permissionsLoading is always false, it's effectively disabled only if roles are not static.
-  // If filteredMenuItems is empty, the dropdown contents won't show anyway.
-  const isManagementDropdownDisabled = permissionsLoading || filteredMenuItems.length === 0;
+  if (!currentUser) {
+    return <div className="flex items-center justify-center min-h-screen">Đang xác thực...</div>;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
@@ -269,49 +168,38 @@ const HomePage: React.FC = () => {
           <a href="#features" className="hover:text-blue-200 transition-colors">Features</a>
           <a href="#contact" className="hover:text-blue-200 transition-colors">Contact</a>
 
-          {/* Management Dropdown */}
           <div className="relative management-dropdown-wrapper">
             <button
-              className={`flex items-center space-x-1 py-2 px-3 rounded-md hover:bg-blue-700 transition-colors
-                                ${isManagementDropdownDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-              onClick={() => !isManagementDropdownDisabled && setIsManagementDropdownOpen(!isManagementDropdownOpen)}
-              disabled={isManagementDropdownDisabled}
+              className="flex items-center space-x-1 py-2 px-3 rounded-md hover:bg-blue-700 transition-colors"
+              onClick={() => setIsManagementDropdownOpen(!isManagementDropdownOpen)}
             >
               <span>Management</span>
-              {isManagementDropdownDisabled ? (
-                <FiLoader className="animate-spin text-sm" />
-              ) : (
-                <FiChevronDown className={`ml-1 transition-transform ${isManagementDropdownOpen ? 'rotate-180' : ''}`} />
-              )}
+              <FiChevronDown className={`ml-1 transition-transform ${isManagementDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
-            {isManagementDropdownOpen && !isManagementDropdownDisabled && (
+            {isManagementDropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white text-gray-800 rounded-md shadow-lg z-20 overflow-hidden">
+                {/* PHẦN RENDER ĐÃ SỬA LẠI ĐỂ AN TOÀN VỀ KIỂU */}
                 {managementDropdownItems.map(item => {
+                  // Bây giờ TypeScript sẽ không báo lỗi nữa vì nó biết `type` luôn tồn tại
                   if (item.type === 'divider') {
                     return <hr key={item.key} className="border-t border-gray-200 my-1" />;
-                  } else if (item.type === 'logout') {
-                    return (
-                      <button
-                        key={item.key}
-                        onClick={item.onClick}
-                        className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 ${item.danger ? 'text-red-600' : ''}`}
-                      >
-                        {item.icon}
-                        <span>{item.label}</span>
-                      </button>
-                    );
-                  } else { // type is 'menu'
-                    return (
-                      <button
-                        key={item.key}
-                        onClick={item.onClick}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2"
-                      >
-                        {item.icon}
-                        <span>{item.label}</span>
-                      </button>
-                    );
                   }
+
+                  // Trong khối else này, TypeScript biết `item` là `RegularMenuItem` hoặc `LogoutMenuItem`.
+                  // Cả hai đều có onClick, icon, label, key.
+                  return (
+                    <button
+                      key={item.key}
+                      onClick={item.onClick}
+                      className={`w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center space-x-2 ${
+                        // Chúng ta có thể kiểm tra `item.type` để xác định class an toàn
+                        item.type === 'logout' && item.danger ? 'text-red-600' : ''
+                      }`}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </button>
+                  );
                 })}
               </div>
             )}
@@ -328,7 +216,7 @@ const HomePage: React.FC = () => {
         </nav>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content (Giữ nguyên không đổi) */}
       <main className="flex-1 pt-20">
         {/* Hero Section */}
         <section className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white text-center py-24 px-6">
@@ -341,7 +229,6 @@ const HomePage: React.FC = () => {
           </a>
         </section>
 
-        {/* Render below-the-fold content or placeholders */}
         {renderBelowFold ? (
           <>
             {/* About Section */}

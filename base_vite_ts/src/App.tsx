@@ -6,6 +6,7 @@ import InvoiceRequestPage from './pages/InvoiceRequest'
 import Login from "./pages/login";
 import Register from "./pages/register";
 import HomePage from "./pages/User/HomePage.tsx";
+import OrderManagermentPage from "./pages/User/OrderManagement.tsx";
 import ProductManagermentPage from "./pages/User/ProductManagement.tsx";
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path='/admin' element={<AdminDashboard />} />
         <Route path='/login' element={<Login />} />
         <Route path='/register' element={<Register />} />
+        <Route path='/orders' element={<OrderManagermentPage />} />
         <Route path='/invoice-requests' element={<InvoiceRequestPage />} />
 
         <Route path='*' element={<Navigate to='/login' replace />} />

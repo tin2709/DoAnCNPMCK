@@ -33,9 +33,9 @@ public class OrderService {
                 .orElseThrow(() -> new IllegalAccessError("User không tồn tại"));
         Status b = statusRepository.findById(request.getIdStatus())
                 .orElseThrow(() -> new IllegalAccessError("Trạng thái không tồn tại"));
-        newOne.setTokenOrder(request.getTokenOrder());
+//        newOne.setTokenOrder(request.getTokenOrder());
         newOne.setDate(Instant.now());
-        newOne.setPicture(request.getPicture());
+//        newOne.setPicture(request.getPicture());
         newOne.setTotal(request.getTotal());
         newOne.setStatus(b);
         newOne.setCreatedBy(a);
@@ -49,5 +49,8 @@ public class OrderService {
                 .orElseThrow(() -> new IllegalAccessError("Trạng thái không tồn tại"));
         a.setStatus(b);
         orderRepository.save(a);
+    }
+    public List<Order> getOrdersByUserId(Integer userId) {
+        return orderRepository.findByCreatedById(userId);
     }
 }

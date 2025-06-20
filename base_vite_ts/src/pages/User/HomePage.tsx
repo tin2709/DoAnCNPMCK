@@ -113,6 +113,16 @@ const HomePage: React.FC = () => {
       onClick: () => {
         navigate('/products');
         setIsManagementDropdownOpen(false);
+      }
+    },
+    {
+      type: 'menu', // <-- THÊM THUỘC TÍNH 'type'
+      key: 'products',
+      icon: <FiBox />,
+      label: 'Hóa đơn',
+      onClick: () => {
+        navigate('/orders');
+        setIsManagementDropdownOpen(false);
       },
     }
   ];

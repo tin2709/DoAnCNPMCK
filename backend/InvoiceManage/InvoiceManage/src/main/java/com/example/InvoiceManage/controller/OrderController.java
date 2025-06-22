@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.Serializable;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,8 +32,16 @@ public class OrderController {
     OrderService orderService;
     @Autowired
     OrderMapper orderMapper;
+    private Instant parseDate(String dateStr, boolean isEnd) {
+        if (dateStr == null || dateStr.isBlank()) {
+            return isEnd ? Instant.now() : LocalDate.now().minusYears(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+        }
+        LocalDate date = LocalDate.parse(dateStr);
+        return isEnd ? date.atTime(23, 59, 59).toInstant(ZoneOffset.UTC) : date.atStartOfDay().toInstant(ZoneOffset.UTC);
+    }
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getStatistics(
+            @AuthenticationPrincipal SecurityUser securityUser,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end) {
 
@@ -80,6 +90,45 @@ public class OrderController {
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(responseDTOs);
+    }
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String, Object>> getSummaryStatistics(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end) {
+
+        Instant startDate = parseDate(start, false);
+        Instant endDate = parseDate(end, true);
+
+        Map<String, Object> summary = orderService.getDashboardSummary(startDate, endDate);
+        return ResponseEntity.ok(summary);
+    }
+
+    @GetMapping("/top-products")
+    public ResponseEntity<?> getTopProducts(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
+            @RequestParam(defaultValue = "quantity") String sortBy,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        Instant startDate = parseDate(start, false);
+        Instant endDate = parseDate(end, true);
+
+        return ResponseEntity.ok(orderService.getTopSellingProducts(startDate, endDate, sortBy, limit));
+    }
+
+    @GetMapping("/frequently-bought-together")
+    public ResponseEntity<?> getFrequentlyBoughtTogether(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @RequestParam(required = false) String start,
+            @RequestParam(required = false) String end,
+            @RequestParam(defaultValue = "10") int limit) {
+
+        Instant startDate = parseDate(start, false);
+        Instant endDate = parseDate(end, true);
+
+        return ResponseEntity.ok(orderService.getFrequentlyBoughtTogether(startDate, endDate, limit));
     }
 
 

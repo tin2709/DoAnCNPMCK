@@ -35,7 +35,6 @@ public class OrderMapper {
         return dto;
     }
 
-    // --- Các phương thức trợ giúp ---
     private OrderDetailResponseDTO toOrderDetailResponseDTO(OrderDetail orderDetail) {
         if (orderDetail == null) {
             return null;
@@ -56,12 +55,11 @@ public class OrderMapper {
             return null;
         }
 
-        ProductInDetailDTO dto = new ProductInDetailDTO();
-        dto.setId(product.getId());
-        dto.setProductName(product.getProductName());
-        dto.setImage(product.getImage());
-
-        return dto;
+        return new ProductInDetailDTO(
+                product.getId(),
+                product.getProductName(),
+                product.getImage()
+        );
     }
 
     private UserInOrderDTO toUserInOrderDTO(User user) {

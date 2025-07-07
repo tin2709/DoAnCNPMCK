@@ -259,21 +259,58 @@ export default function ProductManagement() {
   };
 
   // --- HÀM MỚI: XỬ LÝ KHI TẠO YÊU CẦU HÓA ĐƠN ---
-  const handleCreateInvoice = () => {
-    // Logic thực tế sẽ gọi API để tạo hóa đơn ở đây
-    console.log("Creating invoice with items:", invoiceItems);
-
-    Swal.fire({
-      icon: 'success',
-      title: 'Thành công!',
-      text: `Đã tạo yêu cầu hóa đơn với ${invoiceItems.length} sản phẩm.`,
-      timer: 2000,
-      showConfirmButton: false
-    });
-
-    // Reset giỏ hàng sau khi tạo thành công
-    setInvoiceItems([]);
+  const handleCreateInvoice = async () => {
+    try {
+      // Tính tổng tiền từ danh sách sản phẩm
+      const total = invoiceItems
+        .reduce((sum, item) => sum + item.price * item.quantity, 0)
+        .toFixed(2); // giữ 2 chữ số thập phân, vì API yêu cầu chuỗi "99.48"
+  
+      // Lấy danh sách ID sản phẩm
+      const proList = invoiceItems.map(item => item.id);
+  
+      const payload = {
+        total: total,
+        idStatus: 1, // hoặc truyền giá trị động nếu cần
+        proList: proList
+      };
+  
+      const response = await fetch('http://localhost:8080/api/orders/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.accessToken}`,
+        },
+        body: JSON.stringify(payload)
+      });
+  
+      if (!response.ok) {
+        throw new Error(`Lỗi khi tạo hóa đơn: ${response.status}`);
+      }
+  
+      // const result = await response.json();
+  
+      Swal.fire({
+        icon: 'success',
+        title: 'Thành công!',
+        text: `Đã tạo hóa đơn với ${invoiceItems.length} sản phẩm.`,
+        timer: 2000,
+        showConfirmButton: false
+      });
+  
+      // Reset giỏ hàng sau khi tạo thành công
+      setInvoiceItems([]);
+    } catch (err) {
+      console.error('Lỗi khi gọi API tạo hóa đơn:', err);
+  
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi!',
+        text: 'Không thể tạo hóa đơn. Vui lòng thử lại.',
+      });
+    }
   };
+  
 
 
   // --- RENDER GIAO DIỆN BẰNG REACT THUẦN + TAILWIND CSS ---

@@ -1,7 +1,9 @@
 package com.example.InvoiceManage.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
@@ -10,6 +12,8 @@ import java.math.BigDecimal;
 @Setter
 @Entity
 @Table(name = "order_detail")
+@AllArgsConstructor
+@RequiredArgsConstructor
 public class OrderDetail {
 
     @Id
@@ -50,4 +54,12 @@ public class OrderDetail {
             this.subtotal = price.multiply(BigDecimal.valueOf(quantity));
         }
     }
+    public OrderDetail(Order order, Product product, Integer quantity, BigDecimal price) {
+        this.order = order;
+        this.product = product;
+        this.quantity = quantity;
+        this.price = price;
+        calculateSubtotal(); // Gọi hàm tính subtotal ngay khi khởi tạo
+    }
+
 }

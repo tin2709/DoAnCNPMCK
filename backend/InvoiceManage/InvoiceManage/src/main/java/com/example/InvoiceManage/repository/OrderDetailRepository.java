@@ -11,7 +11,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -22,14 +23,14 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, Intege
             "FROM OrderDetail od WHERE od.order.date BETWEEN :startDate AND :endDate " +
             "GROUP BY od.product " +
             "ORDER BY SUM(od.quantity) DESC")
-    List<BestSellingProductDTO> findTopSellingProductsByQuantity(@Param("startDate") Instant startDate, @Param("endDate") Instant endDate, Pageable pageable);
+    List<BestSellingProductDTO> findTopSellingProductsByQuantity(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate, Pageable pageable);
 
     // Query để lấy top sản phẩm bán chạy nhất dựa trên tổng doanh thu
     @Query("SELECT new com.example.InvoiceManage.DTO.response.BestSellingProductDTO(od.product, SUM(od.quantity), SUM(od.subtotal)) " +
             "FROM OrderDetail od WHERE od.order.date BETWEEN :startDate AND :endDate " +
             "GROUP BY od.product " +
             "ORDER BY SUM(od.subtotal) DESC")
-    List<BestSellingProductDTO> findTopSellingProductsByRevenue(@Param("startDate") Instant startDate, @Param("endDate") Instant endDate, Pageable pageable);
+    List<BestSellingProductDTO> findTopSellingProductsByRevenue(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate, Pageable pageable);
 
     // Query để tìm các cặp sản phẩm thường được mua cùng nhau
     @Query("SELECT od1.product.productName, od2.product.productName, COUNT(od1.order.id) as pairCount " +
@@ -39,8 +40,8 @@ public interface OrderDetailRepository extends JpaRepository<OrderDetail, Intege
             "GROUP BY od1.product.productName, od2.product.productName " +
             "ORDER BY pairCount DESC")
     List<Object[]> findFrequentlyBoughtTogether(
-            @Param("startDate") Instant startDate,
-            @Param("endDate") Instant endDate,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate,
             Pageable pageable
     );
 }

@@ -23,7 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +49,7 @@ public class OrderService {
 
     private OrderMapper orderMapper; // Inject Mapper
 
-    public List<Order> getOrdersByDateRange(Instant startDate, Instant endDate) {
+    public List<Order> getOrdersByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
         return orderRepository.findByDateBetween(startDate, endDate);
     }
 
@@ -170,7 +171,7 @@ public class OrderService {
     public List<Order> getOrdersByUserId(Integer userId) {
         return orderRepository.findByCreatedById(userId);
     }
-    public Map<String, Object> getDashboardSummary(Instant startDate, Instant endDate) {
+    public Map<String, Object> getDashboardSummary(LocalDateTime startDate, LocalDateTime endDate) {
         // Lấy dữ liệu kỳ hiện tại
         Map<String, Object> currentPeriodStats = orderRepository.getSummaryStatistics(startDate, endDate)
                 .orElse(Map.of("totalRevenue", BigDecimal.ZERO, "totalOrders", 0L));
@@ -189,8 +190,8 @@ public class OrderService {
 
         // Tính toán kỳ trước
         long daysBetween = ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        Instant previousStartDate = startDate.minus(daysBetween, ChronoUnit.DAYS);
-        Instant previousEndDate = startDate.minus(1, ChronoUnit.SECONDS);
+        LocalDateTime previousStartDate = startDate.minus(daysBetween, ChronoUnit.DAYS);
+        LocalDateTime previousEndDate = startDate.minus(1, ChronoUnit.SECONDS);
         Map<String, Object> previousPeriodStats = orderRepository.getSummaryStatistics(previousStartDate, previousEndDate)
                 .orElse(Map.of("totalRevenue", BigDecimal.ZERO, "totalOrders", 0L));
 
@@ -207,7 +208,7 @@ public class OrderService {
     /**
      * Lấy top sản phẩm bán chạy nhất.
      */
-    public List<BestSellingProductDTO> getTopSellingProducts(Instant startDate, Instant endDate, String sortBy, int limit) {
+    public List<BestSellingProductDTO> getTopSellingProducts(LocalDateTime startDate, LocalDateTime endDate, String sortBy, int limit) {
         if ("revenue".equalsIgnoreCase(sortBy)) {
             return orderDetailRepository.findTopSellingProductsByRevenue(startDate, endDate, PageRequest.of(0, limit));
         }
@@ -218,7 +219,7 @@ public class OrderService {
     /**
      * Lấy các cặp sản phẩm thường được mua cùng nhau.
      */
-    public List<Map<String, Object>> getFrequentlyBoughtTogether(Instant startDate, Instant endDate, int limit) {
+    public List<Map<String, Object>> getFrequentlyBoughtTogether(LocalDateTime startDate, LocalDateTime endDate, int limit) {
         List<Object[]> results = orderDetailRepository.findFrequentlyBoughtTogether(startDate, endDate, PageRequest.of(0, limit));
         return results.stream()
                 .map(row -> Map.of(

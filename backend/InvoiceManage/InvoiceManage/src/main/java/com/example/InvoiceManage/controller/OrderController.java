@@ -16,45 +16,51 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.Serializable;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
-//@RequestMapping("/dashboard")
 @RequestMapping(SecurityConstants.API_PREFIX + "/orders")
 @CrossOrigin(origins = "http://localhost:3000")
 public class OrderController {
     @Autowired
-    OrderService orderService;
+    private OrderService orderService;
     @Autowired
-    OrderMapper orderMapper;
+    private OrderMapper orderMapper;
     @Autowired
-    private InvoiceRequestRepository invoiceRequestRepository;
-    private Instant parseDate(String dateStr, boolean isEnd) {
+    private InvoiceRequestRepository invoiceRequestRepository; // Có vẻ không được sử dụng, có thể xem xét xóa
+
+    /**
+     * Hàm helper để chuyển đổi chuỗi ngày (yyyy-MM-dd) thành LocalDateTime.
+     * @param dateStr Chuỗi ngày từ request.
+     * @param isEnd   True nếu là ngày kết thúc (lấy cuối ngày), false nếu là ngày bắt đầu (lấy đầu ngày).
+     * @return Một đối tượng LocalDateTime.
+     */
+    private LocalDateTime parseDateTime(String dateStr, boolean isEnd) {
         if (dateStr == null || dateStr.isBlank()) {
-            return isEnd ? Instant.now() : LocalDate.now().minusYears(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            // Nếu không có ngày, trả về một khoảng mặc định (ví dụ: 1 năm trước đến hiện tại)
+            return isEnd ? LocalDateTime.now() : LocalDate.now().minusYears(1).atStartOfDay();
         }
         LocalDate date = LocalDate.parse(dateStr);
-        return isEnd ? date.atTime(23, 59, 59).toInstant(ZoneOffset.UTC) : date.atStartOfDay().toInstant(ZoneOffset.UTC);
+        return isEnd ? date.atTime(LocalTime.MAX) : date.atStartOfDay();
     }
+
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getStatistics(
             @AuthenticationPrincipal SecurityUser securityUser,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end) {
 
-        Instant startDate = (start != null) ? Instant.parse(start + "T00:00:00Z") : null;
-        Instant endDate = (end != null) ? Instant.parse(end + "T23:59:59Z") : null;
+        // Sử dụng hàm helper mới để chuyển đổi an toàn
+        LocalDateTime startDate = parseDateTime(start, false);
+        LocalDateTime endDate = parseDateTime(end, true);
 
-        List<Order> orders = (startDate != null && endDate != null)
-                ? orderService.getOrdersByDateRange(startDate, endDate)
-                : orderService.getAllOrders();
+        List<Order> orders = orderService.getOrdersByDateRange(startDate, endDate);
 
         List<Map<String, Object>> response = orders.stream().map(order -> {
             Map<String, Object> map = new HashMap<>();
@@ -73,8 +79,8 @@ public class OrderController {
         Order createdOrder = orderService.addOrder(request);
         OrderResponseDTO responseDTO = orderMapper.toOrderResponseDTO(createdOrder);
         return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
-
     }
+
     @PutMapping("/update")
     public ResponseEntity<Void> updateOrder(
             @AuthenticationPrincipal SecurityUser securityUser,
@@ -82,73 +88,61 @@ public class OrderController {
         orderService.updateOrder(request.getOrderId(), request.getStatusId());
         return ResponseEntity.ok().build();
     }
+
     @DeleteMapping("/{orderId}")
     public ResponseEntity<Void> undoOrder(
             @AuthenticationPrincipal SecurityUser securityUser,
             @PathVariable Integer orderId) {
         orderService.undoOrderCreation(orderId);
-        // Trả về mã 204 No Content - tiêu chuẩn cho một yêu cầu DELETE thành công
         return ResponseEntity.noContent().build();
     }
+
     @GetMapping("/list")
     public ResponseEntity<List<OrderSummaryDTO>> getOrders(
             @AuthenticationPrincipal SecurityUser securityUser) {
         List<OrderSummaryDTO> list = orderService.getAllOrder();
         return ResponseEntity.ok(list);
     }
+
     @GetMapping("/user/{userId}")
     public ResponseEntity<?> getOrdersForUser(
             @PathVariable Integer userId,
             @AuthenticationPrincipal SecurityUser securityUser) {
-
         List<Order> userOrders = orderService.getOrdersByUserId(userId);
-
-        // Chuyển đổi sang DTO
         List<OrderResponseDTO> responseDTOs = userOrders.stream()
-                .map(orderMapper::toOrderResponseDTO) // Dòng này sẽ gọi mapper mới của chúng ta
+                .map(orderMapper::toOrderResponseDTO)
                 .collect(Collectors.toList());
-
         return ResponseEntity.ok(responseDTOs);
     }
+
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> getSummaryStatistics(
-            @AuthenticationPrincipal SecurityUser securityUser,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end) {
-
-        Instant startDate = parseDate(start, false);
-        Instant endDate = parseDate(end, true);
-
+        LocalDateTime startDate = parseDateTime(start, false);
+        LocalDateTime endDate = parseDateTime(end, true);
         Map<String, Object> summary = orderService.getDashboardSummary(startDate, endDate);
         return ResponseEntity.ok(summary);
     }
 
     @GetMapping("/top-products")
     public ResponseEntity<?> getTopProducts(
-            @AuthenticationPrincipal SecurityUser securityUser,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
             @RequestParam(defaultValue = "quantity") String sortBy,
             @RequestParam(defaultValue = "10") int limit) {
-
-        Instant startDate = parseDate(start, false);
-        Instant endDate = parseDate(end, true);
-
+        LocalDateTime startDate = parseDateTime(start, false);
+        LocalDateTime endDate = parseDateTime(end, true);
         return ResponseEntity.ok(orderService.getTopSellingProducts(startDate, endDate, sortBy, limit));
     }
 
     @GetMapping("/frequently-bought-together")
     public ResponseEntity<?> getFrequentlyBoughtTogether(
-            @AuthenticationPrincipal SecurityUser securityUser,
             @RequestParam(required = false) String start,
             @RequestParam(required = false) String end,
             @RequestParam(defaultValue = "10") int limit) {
-
-        Instant startDate = parseDate(start, false);
-        Instant endDate = parseDate(end, true);
-
+        LocalDateTime startDate = parseDateTime(start, false);
+        LocalDateTime endDate = parseDateTime(end, true);
         return ResponseEntity.ok(orderService.getFrequentlyBoughtTogether(startDate, endDate, limit));
     }
-
-
 }

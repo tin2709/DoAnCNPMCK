@@ -6,6 +6,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,7 +35,7 @@ public class Order {
     private Status status;
 
     @Column(name = "date")
-    private Instant date;
+    private LocalDateTime date = LocalDateTime.now();
 
 //    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @ManyToOne(fetch = FetchType.EAGER)

@@ -24,4 +24,10 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             "WHERE o.createdBy.id NOT IN (SELECT o2.createdBy.id FROM Order o2 WHERE o2.date < :startDate) " +
             "AND o.date BETWEEN :startDate AND :endDate")
     long countNewCustomers(@Param("startDate") Instant startDate, @Param("endDate") Instant endDate);
+    @Query("SELECT o FROM Order o " +
+            "LEFT JOIN FETCH o.orderDetails od " +
+            "LEFT JOIN FETCH od.product p " +
+            "JOIN FETCH o.status s " +
+            "JOIN FETCH o.createdBy u")
+    List<Order> findAllWithDetails();
 }

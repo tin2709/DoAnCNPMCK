@@ -10,6 +10,7 @@ import java.util.Optional;
 public interface InvoiceRequestRepository extends JpaRepository<InvoiceRequest, Long> {
         List<InvoiceRequest> findByStatus(Status status);
         Optional<InvoiceRequest> findById(Long id);
+    Optional<InvoiceRequest> findByOrderId(Long orderId);
 
 
 

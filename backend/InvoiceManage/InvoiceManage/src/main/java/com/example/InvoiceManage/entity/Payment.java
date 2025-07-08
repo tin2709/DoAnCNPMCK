@@ -16,9 +16,9 @@ public class Payment {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @ManyToOne
-    @JoinColumn(name = "invoice_id", nullable = false)
-    private Invoice invoice;
+    @ManyToOne(fetch = FetchType.LAZY) // Dùng LAZY để tối ưu hiệu năng
+    @JoinColumn(name = "order_id", nullable = false) // Đổi tên cột join thành order_id
+    private Order order; // Đổi từ "private Invoice invoice;" thành "private Order order;
 
     @Column(name = "paid_at", nullable = false)
     private LocalDateTime paidAt = LocalDateTime.now();

@@ -17,9 +17,7 @@ public class BestSellingProductDTO {
     private BigDecimal totalRevenue;
     public BestSellingProductDTO(com.example.InvoiceManage.entity.Product productEntity, Long totalQuantity, BigDecimal totalRevenue) {
         this.product = new ProductInDetailDTO(
-                productEntity.getId(),
-                productEntity.getProductName(),
-                productEntity.getImage()
+                productEntity.getProductName()
         );
         this.totalQuantity = totalQuantity;
         this.totalRevenue = totalRevenue;

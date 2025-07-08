@@ -7,6 +7,7 @@ import com.example.InvoiceManage.entity.InvoiceRequest;
 import com.example.InvoiceManage.entity.Order;
 import com.example.InvoiceManage.entity.Status;
 import com.example.InvoiceManage.repository.*;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -147,5 +148,26 @@ public class InvoiceRequestService {
 
         // 8. Lưu và trả về yêu cầu đã được cập nhật
         return invoiceRequestRepository.save(request);
+    }
+    @Transactional
+    public InvoiceRequest updateStatusByOrderId(Long orderId, Integer newStatusId) {
+        // Bước 1: Tìm InvoiceRequest thông qua orderId.
+        // Nếu không tìm thấy, ném ra lỗi.
+        InvoiceRequest invoiceRequest = invoiceRequestRepository.findByOrderId(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy InvoiceRequest nào cho Order ID: " + orderId));
+
+        // Bước 2: Tìm trạng thái (Status) mới từ newStatusId.
+        // Nếu không tìm thấy, ném ra lỗi.
+        Status newStatus = statusRepository.findById(newStatusId)
+                .orElseThrow(() -> new EntityNotFoundException("Không tìm thấy Status với ID: " + newStatusId));
+
+        // (Tùy chọn - Logic bảo mật) Bạn có thể kiểm tra xem người dùng hiện tại có quyền cập nhật không
+        // ví dụ: SecurityContextHolder.getContext().getAuthentication()...
+
+        // Bước 3: Cập nhật trạng thái cho InvoiceRequest đã tìm thấy.
+        invoiceRequest.setStatus(newStatus);
+
+        // Bước 4: Lưu lại vào CSDL và trả về entity đã được cập nhật.
+        return invoiceRequestRepository.save(invoiceRequest);
     }
 }

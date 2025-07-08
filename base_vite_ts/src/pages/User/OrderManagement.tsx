@@ -113,11 +113,11 @@ export default function OrderManagement() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const navigate = useNavigate();
   // --- THÊM MỚI: State cho dropdown và dark mode ---
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const location = useLocation(); // Hook để xác định trang hiện tại
-
+  const navigate = useNavigate();
+  const [paymentProcessingOrderId, setPaymentProcessingOrderId] = useState<number | null>(null);
   // --- THÊM MỚI: Logic quản lý Dark Mode ---
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (localStorage.theme === 'dark') return true;
@@ -252,21 +252,63 @@ export default function OrderManagement() {
   };
 
   // --- THÊM MỚI: Hàm xử lý sự kiện cho nút Thanh toán ---
-  const handlePayment = (orderId: number, event: React.MouseEvent) => {
+// --- THAY THẾ TOÀN BỘ HÀM handlePayment CŨ BẰNG HÀM NÀY ---
+  const handlePayment = async (order: Order, event: React.MouseEvent) => {
     event.stopPropagation(); // Ngăn sự kiện click của hàng (tr) được kích hoạt
-    Swal.fire({
-      title: 'Xác nhận Thanh toán',
-      text: `Bạn có muốn tiến hành thanh toán cho đơn hàng #${orderId}?`,
-      icon: 'question',
-      showCancelButton: true,
-      confirmButtonText: 'Đồng ý',
-      cancelButtonText: 'Hủy'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        // TODO: Thêm logic gọi API thanh toán ở đây
-        Swal.fire('Đã gửi yêu cầu', 'Yêu cầu thanh toán của bạn đang được xử lý.', 'info');
+    setPaymentProcessingOrderId(order.id);
+
+    // Lấy thông tin đăng nhập và token
+    const authInfo = getAuthInfo();
+    if (!authInfo || !authInfo.accessToken) {
+      Swal.fire('Lỗi xác thực', 'Không tìm thấy thông tin đăng nhập. Vui lòng đăng nhập lại.', 'error');
+      setPaymentProcessingOrderId(null);
+      return;
+    }
+
+    try {
+      // 1. Gọi API của VNPay để tạo URL thanh toán
+      const response = await axios.post(
+        "http://localhost:8080/api/vnpay/create-order",
+        {
+          amount: order.total, // Lấy tổng tiền từ đối tượng order
+          orderId: order.id,   // ID của đơn hàng
+          bankCode: ""         // Để trống cho người dùng chọn trên cổng VNPay
+        },
+        {
+          headers: { Authorization: `Bearer ${authInfo.accessToken}` }
+
+        }
+      );
+
+      // 2. Lấy paymentUrl từ response
+      const { paymentUrl } = response.data;
+
+      // 3. Kiểm tra và chuyển hướng
+      if (paymentUrl) {
+        console.log("Redirecting to VNPay URL:", paymentUrl);
+        // Chuyển hướng người dùng đến cổng thanh toán của VNPay
+        window.location.href = paymentUrl;
+      } else {
+        throw new Error("Không nhận được URL thanh toán từ máy chủ.");
       }
-    });
+
+    } catch (err: any) {
+      console.error("❌ Lỗi trong quá trình tạo yêu cầu thanh toán VNPay:", err);
+      let errorMessageToShow = "Đã xảy ra lỗi trong quá trình khởi tạo thanh toán.";
+
+      if (axios.isAxiosError(err)) {
+        if (err.response) {
+          errorMessageToShow = err.response.data?.message || err.response.data?.error || `Lỗi máy chủ: ${err.response.status}`;
+        } else if (err.request) {
+          errorMessageToShow = "Lỗi mạng. Vui lòng kiểm tra kết nối.";
+        }
+      } else if (err.message) {
+        errorMessageToShow = err.message;
+      }
+
+      Swal.fire('Thanh toán thất bại', errorMessageToShow, 'error');
+      setPaymentProcessingOrderId(null); // Reset trạng thái processing để người dùng có thể thử lại
+    }
   };
 
   const getStatusClass = (statusName: string) => {
@@ -385,9 +427,10 @@ export default function OrderManagement() {
                           <span>Xem</span>
                         </button>
                         {order.statusName.toLowerCase() === 'chờ thanh toán' && (
-                          <button onClick={(e) => handlePayment(order.id, e)} className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1 cursor-pointer">
+                          <button onClick={(e) => handlePayment(order,e)} disabled={paymentProcessingOrderId === order.id}
+                                  className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                             <FiCreditCard />
-                            <span>Thanh toán</span>
+                            <span>{paymentProcessingOrderId === order.id ? 'Đang xử lý...' : 'Thanh toán'}</span>
                           </button>
                         )}
                       </div>

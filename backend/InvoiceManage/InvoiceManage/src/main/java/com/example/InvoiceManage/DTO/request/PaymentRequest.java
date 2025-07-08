@@ -9,6 +9,6 @@ import lombok.*;
 @AllArgsConstructor@NoArgsConstructor
 public class PaymentRequest {
     private int amount;
-    private int invoiceRequestId;
+    private Integer orderId; // ĐÃ THAY ĐỔI: từ invoiceRequestId thành orderId
     private String bankCode;
 }

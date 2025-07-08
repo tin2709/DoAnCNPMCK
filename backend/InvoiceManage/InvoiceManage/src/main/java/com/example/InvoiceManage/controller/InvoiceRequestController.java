@@ -89,6 +89,25 @@ public class InvoiceRequestController {
                 .createdAt(LocalDateTime.parse(request.getCreatedAt().toString()))
                 .build();
     }
+    @PutMapping("/by-order/{orderId}/status")
+    public ResponseEntity<InvoiceRequestResponse> updateStatusByOrderId(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @PathVariable("orderId") Long orderId,
+            @RequestBody Map<String, Integer> payload) {
+
+        Integer newStatusId = payload.get("statusId");
+        if (newStatusId == null) {
+            return ResponseEntity.badRequest().body(null); // Trả về lỗi nếu không có statusId
+        }
+
+        // Gọi phương thức service mới để thực hiện logic
+        InvoiceRequest updatedEntity = invoiceRequestService.updateStatusByOrderId(orderId, newStatusId);
+
+        // Tái sử dụng hàm convertToDto để trả về response chuẩn
+        InvoiceRequestResponse responseDto = convertToDto(updatedEntity);
+
+        return ResponseEntity.ok(responseDto);
+    }
 
 
 

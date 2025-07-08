@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Swal from 'sweetalert2';
+import Chatbox from '../Chatbox.tsx'; // <<<<---- IMPORT THE CHATBOX COMPONENT (adjust path if needed)
 
 // Import react-icons (giữ nguyên)
 import {
@@ -65,6 +66,11 @@ interface FormState {
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<LoggedInUser | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const toggleChat = () => {
+    setIsChatOpen(!isChatOpen);
+  };
 
   useEffect(() => {
     const userLoginInfoString = localStorage.getItem('userLoginInfo');
@@ -449,6 +455,42 @@ const HomePage: React.FC = () => {
       <footer className="bg-gray-800 text-white py-6 text-center text-sm">
         © {new Date().getFullYear()} InvoicePro. All rights reserved.
       </footer>
+      {!isChatOpen && (
+        <button
+          onClick={toggleChat}
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            backgroundColor: '#4299E1', // Màu xanh lam
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '28px',
+            zIndex: 1000,
+            transition: 'transform 0.2s ease-in-out, background-color 0.2s ease',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          aria-label="Open Chat"
+        >
+          💬
+        </button>
+      )}
+
+      {isChatOpen && (
+        <Chatbox
+          onClose={toggleChat}
+        />
+      )}
+ 
     </div>
   );
 };

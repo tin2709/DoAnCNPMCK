@@ -56,9 +56,7 @@ public class OrderMapper {
         }
 
         return new ProductInDetailDTO(
-                product.getId(),
-                product.getProductName(),
-                product.getImage()
+                product.getProductName()
         );
     }
 
@@ -72,5 +70,34 @@ public class OrderMapper {
         dto.setUsername(user.getName()); // Giả sử User entity có trường username
 
         return dto;
+    }
+    public OrderSummaryDTO toOrderSummaryDTO(Order order) {
+        if (order == null) {
+            return null;
+        }
+
+        return new OrderSummaryDTO(
+                order.getId(),
+                order.getTotal(),
+                order.getDate(),
+                order.getStatus().getId(),
+                order.getStatus().getStatusName(),
+                order.getCreatedBy().getName(),
+                order.getOrderDetails().stream()
+                        .map(this::toOrderDetailInfoDTO)
+                        .collect(Collectors.toList())
+        );
+    }
+
+    private OrderDetailInfoDTO toOrderDetailInfoDTO(OrderDetail detail) {
+        if (detail == null) {
+            return null;
+        }
+
+        return new OrderDetailInfoDTO(
+                detail.getQuantity(),
+                detail.getPrice(),
+                new ProductInfoDTO(detail.getProduct().getProductName())
+        );
     }
 }

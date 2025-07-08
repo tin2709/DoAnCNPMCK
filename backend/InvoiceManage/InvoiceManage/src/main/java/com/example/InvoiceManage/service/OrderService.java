@@ -2,7 +2,9 @@ package com.example.InvoiceManage.service;
 
 import com.example.InvoiceManage.DTO.request.OrderRequest;
 
+import com.example.InvoiceManage.DTO.response.OrderSummaryDTO;
 import com.example.InvoiceManage.entity.*;
+import com.example.InvoiceManage.mapper.OrderMapper;
 import com.example.InvoiceManage.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -42,6 +44,9 @@ public class OrderService {
     private ProductRepository productRepository;
     @Autowired
     private OrderDetailRepository orderDetailRepository;
+    @Autowired
+
+    private OrderMapper orderMapper; // Inject Mapper
 
     public List<Order> getOrdersByDateRange(Instant startDate, Instant endDate) {
         return orderRepository.findByDateBetween(startDate, endDate);
@@ -49,6 +54,15 @@ public class OrderService {
 
     public List<Order> getAllOrders() {
         return orderRepository.findAll();
+    }
+    public List<OrderSummaryDTO> getAllOrder() {
+        // Dùng JOIN FETCH để lấy hết dữ liệu trong 1 lần query
+        List<Order> orders = orderRepository.findAllWithDetails();
+
+        // Dùng mapper để chuyển đổi
+        return orders.stream()
+                .map(orderMapper::toOrderSummaryDTO)
+                .collect(Collectors.toList());
     }
     @Transactional // Rất quan trọng để đảm bảo tính toàn vẹn dữ liệu
     public Order addOrder(OrderRequest request) {
@@ -64,7 +78,6 @@ public class OrderService {
         Order newOrder = new Order();
         newOrder.setCreatedBy(currentUser);
         newOrder.setStatus(orderStatus);
-        newOrder.setDate(Instant.now());
 
         BigDecimal calculatedTotal = BigDecimal.ZERO;
         List<OrderDetail> detailsForOrder = new ArrayList<>();

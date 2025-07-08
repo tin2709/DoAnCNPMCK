@@ -131,6 +131,16 @@
 			<version>0.11.5</version>
 			<scope>runtime</scope> <!-- This one is also for runtime JSON processing -->
 		</dependency>
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>24.10.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.stripe</groupId>
+			<artifactId>stripe-java</artifactId>
+			<version>24.6.0</version> <!-- bản mới nhất tùy thời điểm -->
+		</dependency>
 	</dependencies>
 
 	<build>

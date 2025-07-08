@@ -1,202 +1,217 @@
-import { useEffect, useState } from 'react'
-import { format, parseISO } from 'date-fns'
-import OrderDetails from './OrderDetails'
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { format, parseISO } from 'date-fns';
+import axios from 'axios';
+import Swal from 'sweetalert2';
 
-const OrderManagement = () => {
-  const [orders, setOrders] = useState([]);
-  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newOrder, setNewOrder] = useState({
-    picture: '',
-    tokenOrder: '',
-    total: '',
-    userId: '',
-    idStatus: '1'
-  });
+// --- ĐỊNH NGHĨA CÁC KIỂU DỮ LIỆU MỚI (KHỚP VỚI DTO CỦA BACKEND) ---
 
+interface ProductInfo {
+  productName: string;
+}
+
+interface OrderDetailInfo {
+  quantity: number;
+  price: number;
+  product: ProductInfo;
+}
+
+// Đây là interface chính cho mỗi đơn hàng nhận về từ API
+interface ApiOrderSummary {
+  id: number;
+  total: number;
+  date: string;
+  statusId: number;
+  statusName: string;
+  customerName: string;
+  orderDetails: OrderDetailInfo[];
+}
+
+// Kiểu MappedOrder giờ có thể được đơn giản hóa hoặc giữ nguyên nếu bạn muốn
+// Ở đây, ta giữ nguyên để không phải sửa nhiều ở JSX
+interface MappedOrder {
+  id: number;
+  orderCode: string;
+  customerName: string;
+  totalAmount: number;
+  statusName: string;
+  statusId: number;
+  orderDate: string;
+  orderDetails: OrderDetailInfo[];
+}
+
+const OrderManagement: React.FC = () => {
+  const navigate = useNavigate();
+  const [orders, setOrders] = useState<MappedOrder[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [paymentProcessingOrderId, setPaymentProcessingOrderId] = useState<number | null>(null);
+  const [hoveredOrderId, setHoveredOrderId] = useState<number | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8080/dashboard/list')
-      .then(response => response.json())
-      .then(data => {
-        // Map lại để đồng bộ cấu trúc dữ liệu với component
-        const mapped = data.map((item: any) => ({
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      Swal.fire('Lỗi', 'Bạn chưa đăng nhập. Vui lòng đăng nhập để tiếp tục.', 'error');
+      navigate('/login');
+      return;
+    }
+
+    const fetchOrders = async () => {
+      setIsLoading(true);
+      try {
+        const response = await axios.get<ApiOrderSummary[]>('http://localhost:8080/api/orders/list', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        // Mapping giờ trở nên đơn giản hơn vì DTO đã phẳng hơn
+        const mappedData: MappedOrder[] = response.data.map((item) => ({
           id: item.id,
-          orderCode: item.tokenOrder,
-          customerName: item.createBy?.name || 'Unknown',
+          orderCode: `DH-${item.id.toString().padStart(5, '0')}`,
+          customerName: item.customerName,
           totalAmount: item.total,
-          status: item.status?.name || 'pending',
-          orderDate: item.date // vẫn là chuỗi ISO, parse sau
+          statusName: item.statusName,
+          statusId: item.statusId,
+          orderDate: item.date,
+          orderDetails: item.orderDetails || [],
         }));
-        setOrders(mapped);
-        console.log(mapped);
-      })
-      .catch(error => {
-        console.error('Có lỗi:', error);
-      });
-  }, []);
+        setOrders(mappedData);
+      } catch (error: any) {
+        let errorMessage = "Không thể tải danh sách đơn hàng.";
+        if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          errorMessage = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+        }
+        Swal.fire('Lỗi', errorMessage, 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    fetchOrders();
+  }, [navigate]);
 
-  const handleStatusChange = (orderId: any, newStatus: any) => {
-    setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: newStatus } : order)));
+  // --- Hàm handlePayment không đổi ---
+  const handlePayment = async (order: MappedOrder) => {
+    setPaymentProcessingOrderId(order.id);
+    const token = localStorage.getItem('accessToken');
+
+    if (!token) {
+      Swal.fire('Lỗi xác thực', 'Không tìm thấy mã truy cập. Vui lòng đăng nhập lại.', 'error');
+      setPaymentProcessingOrderId(null);
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        "http://localhost:8080/api/vnpay/create-order",
+        {
+          amount: order.totalAmount,
+          orderId: order.id,
+          bankCode: ""
+        },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+
+      const { paymentUrl } = response.data;
+      if (paymentUrl) {
+        window.location.href = paymentUrl;
+      } else {
+        throw new Error("Không nhận được URL thanh toán từ máy chủ.");
+      }
+
+    } catch (err: any) {
+      let errorMessageToShow = "Đã xảy ra lỗi trong quá trình khởi tạo thanh toán.";
+      if (axios.isAxiosError(err)) {
+        errorMessageToShow = err.response?.data?.message || `Lỗi máy chủ: ${err.response?.status}`;
+      } else if (err instanceof Error) {
+        errorMessageToShow = err.message;
+      }
+      Swal.fire('Thanh toán thất bại', errorMessageToShow, 'error');
+      setPaymentProcessingOrderId(null);
+    }
   };
 
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.orderCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'All' || order.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p className="text-lg text-gray-600">Đang tải danh sách đơn hàng...</p>
+      </div>
+    );
+  }
 
   return (
+    <div className='max-w-7xl mx-auto p-4 sm:p-6 lg:p-8'>
+      <h1 className="text-3xl font-bold mb-6">Lịch sử Đơn hàng</h1>
 
-    <div className='max-w-7xl mx-auto'>
-      {selectedOrder ? (
-        <OrderDetails onClose={() => setSelectedOrder(null)} />
-      ) : (
-        <>
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Order Management</h1>
-          <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Tạo đơn hàng
-          </button>
-        </div>
-        {isCreateModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center">
-            <div className="bg-white dark:bg-gray-900 p-6 rounded shadow-md w-96">
-              <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Tạo đơn hàng mới</h2>
-              <div className="space-y-4">
-                <input
-                  type="text"
-                  placeholder="Token Order"
-                  value={newOrder.tokenOrder}
-                  onChange={(e) => setNewOrder({ ...newOrder, tokenOrder: e.target.value })}
-                  className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Total"
-                  value={newOrder.total}
-                  onChange={(e) => setNewOrder({ ...newOrder, total: e.target.value })}
-                  className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white"
-                />
-                <input
-                  type="text"
-                  placeholder="User ID"
-                  value={newOrder.userId}
-                  onChange={(e) => setNewOrder({ ...newOrder, userId: e.target.value })}
-                  className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white"
-                />
-                <select
-                  value={newOrder.idStatus}
-                  onChange={(e) => setNewOrder({ ...newOrder, idStatus: e.target.value })}
-                  className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white"
+      <div className='bg-white rounded-lg shadow-md overflow-x-auto'>
+        <table className='min-w-full divide-y divide-gray-200'>
+          <thead className='bg-gray-50'>
+          <tr>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'>Mã Đơn</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'>Khách Hàng</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'>Tổng Tiền</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'>Trạng Thái</th>
+            <th className='px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase'>Ngày Đặt</th>
+          </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+          {orders.length > 0 ? (
+            orders.map((order) => (
+              <tr key={order.id}>
+                <td className='px-6 py-4 text-sm font-medium text-gray-900'>{order.orderCode}</td>
+                <td className='px-6 py-4 text-sm text-gray-600'>{order.customerName}</td>
+
+                <td
+                  className='px-6 py-4 text-sm font-semibold text-gray-600 relative'
+                  onMouseEnter={() => setHoveredOrderId(order.id)}
+                  onMouseLeave={() => setHoveredOrderId(null)}
                 >
-                  <option value="1">Pending</option>
-                  <option value="2">Approved</option>
-                  <option value="3">Delivering</option>
-                </select>
-              </div>
-              <div className="flex justify-end mt-6 space-x-2">
-                <button
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Hủy
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const response = await fetch('http://localhost:8080/dashboard/add', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newOrder)
-                      });
-                      if (response.ok) {
-                        alert('Tạo đơn hàng thành công!');
-                        setIsCreateModalOpen(false);
-                        setNewOrder({ picture: '', tokenOrder: '', total: '', userId: '', idStatus: '1' });
-                        // gọi lại API danh sách đơn hàng
-                        const res = await fetch('http://localhost:8080/dashboard/list');
-                        const data = await res.json();
-                        setOrders(data.map((item: any) => ({
-                          id: item.id,
-                          orderCode: item.tokenOrder,
-                          customerName: item.createBy?.name || 'Unknown',
-                          totalAmount: item.total,
-                          status: item.status?.name || 'pending',
-                          orderDate: item.createAt
-                        })));
-                      } else {
-                        alert('Tạo đơn hàng thất bại!');
-                      }
-                    } catch (error) {
-                      console.error('Lỗi tạo đơn hàng:', error);
-                      alert('Lỗi kết nối máy chủ!');
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Tạo
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                  {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalAmount)}
+
+                  {hoveredOrderId === order.id && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 bg-gray-800 text-white rounded-lg shadow-lg z-10 text-xs">
+                      <h4 className="font-bold border-b border-gray-600 pb-1 mb-2">Chi tiết sản phẩm</h4>
+                      <ul className="space-y-1">
+                        {order.orderDetails.map(detail => (
+                          <li key={detail.id} className="flex justify-between">
+                            {/* Truy cập tên sản phẩm qua detail.product.productName */}
+                            <span className="truncate pr-2">{detail.product?.productName || 'N/A'} (x{detail.quantity})</span>
+                            <span className="font-mono whitespace-nowrap">
+                                {new Intl.NumberFormat('vi-VN').format(detail.price * detail.quantity)} đ
+                              </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </td>
+
+                <td className='px-6 py-4 text-sm'>
+                    <span className={`px-2 py-1 inline-flex text-xs font-semibold rounded-full 
+                      ${order.statusId === 4 ? 'bg-green-100 text-green-800' :
+                      order.statusId === 2 ? 'bg-red-100 text-red-800' :
+                        order.statusId === 3 ? 'bg-blue-100 text-blue-800' :
+                          'bg-yellow-100 text-yellow-800'}`}>
+                      {order.statusName}
+                    </span>
+                </td>
+                <td className='px-6 py-4 text-sm text-gray-600'>
+                  {order.orderDate ? format(parseISO(order.orderDate), 'dd/MM/yyyy HH:mm') : 'N/A'}
+                </td>
 
 
-          {/* UI filter ... */}
-          <div className='bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden'>
-            <table className='min-w-full divide-y divide-gray-200 dark:divide-gray-700'>
-              <thead className='bg-gray-50 dark:bg-gray-900'>
-                <tr>
-                  <th className='px-6 py-3'>Order Code</th>
-                  <th className='px-6 py-3'>Customer Name</th>
-                  <th className='px-6 py-3'>Total Amount</th>
-                  <th className='px-6 py-3'>Status</th>
-                  <th className='px-6 py-3'>Order Date</th>
-                  <th className='px-6 py-3 text-right'>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => (
-                  <tr key={order.id}>
-                    <td className='px-6 py-4'>{order.orderCode}</td>
-                    <td className='px-6 py-4'>{order.customerName}</td>
-                    <td className='px-6 py-4'>
-                      {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.totalAmount)}
-                    </td>
-                    <td className='px-6 py-4'>
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      >
-                        <option value='pending'>Pending</option>
-                        <option value='approved'>Approved</option>
-                        <option value='delivering'>Delivering</option>
-                      </select>
-                    </td>
-                    <td className='px-6 py-4'>
-                      {order.orderDate
-                        ? format(parseISO(order.orderDate), 'MMM dd, yyyy')
-                        : 'N/A'}
-                    </td>
-                    <td className='px-6 py-4 text-right'>
-                      <button onClick={() => setSelectedOrder(order)}>View Details</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
+              </tr>
+            ))
+          ) : (
+            <tr>
+              <td colSpan={6} className="text-center py-10 text-gray-500">
+                Không có đơn hàng nào.
+              </td>
+            </tr>
+          )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

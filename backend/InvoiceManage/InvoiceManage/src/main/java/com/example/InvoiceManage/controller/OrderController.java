@@ -3,6 +3,7 @@ package com.example.InvoiceManage.controller;
 import com.example.InvoiceManage.DTO.request.OrderRequest;
 import com.example.InvoiceManage.DTO.request.OrderUpdate;
 import com.example.InvoiceManage.DTO.response.OrderResponseDTO;
+import com.example.InvoiceManage.DTO.response.OrderSummaryDTO;
 import com.example.InvoiceManage.config.constants.SecurityConstants;
 import com.example.InvoiceManage.entity.Order;
 import com.example.InvoiceManage.entity.SecurityUser;
@@ -90,10 +91,9 @@ public class OrderController {
         return ResponseEntity.noContent().build();
     }
     @GetMapping("/list")
-    public ResponseEntity<List<Order>> getOrders(
-            @AuthenticationPrincipal SecurityUser securityUser
-            ) {
-        List<Order> list = orderService.getAllOrders();
+    public ResponseEntity<List<OrderSummaryDTO>> getOrders(
+            @AuthenticationPrincipal SecurityUser securityUser) {
+        List<OrderSummaryDTO> list = orderService.getAllOrder();
         return ResponseEntity.ok(list);
     }
     @GetMapping("/user/{userId}")

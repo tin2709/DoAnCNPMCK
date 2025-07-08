@@ -490,7 +490,7 @@ const HomePage: React.FC = () => {
           onClose={toggleChat}
         />
       )}
- 
+
     </div>
   );
 };

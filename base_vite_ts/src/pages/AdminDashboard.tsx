@@ -4,6 +4,7 @@ import UserManagement from '../components/UserManagement';
 import OrderManagement from './OrderManagement'; // Assuming this is also a .js or .tsx file
 import DashBoard from './DashBoard'; // Assuming this is also a .js or .tsx file
 import Chatbox from './Chatbox'; // <<<<---- IMPORT THE CHATBOX COMPONENT (adjust path if needed)
+import InvoiceRequestPage from './InvoiceRequest';
 
 const AdminDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -50,8 +51,11 @@ const AdminDashboard = () => {
           <UserManagement users={users} setUsers={setUsers} />
         ) : activeView === 'orders' ? ( // Assuming 'orders' is the key for OrderManagement
           <OrderManagement />
+        ) : activeView === 'invoice-requests' ? ( // Assuming 'orders' is the key for OrderManagement
+          <InvoiceRequestPage />
         ) : (
-          <div>Please select a view from the sidebar.</div> // Fallback content
+          // <<< SỬA LỖI Ở ĐÂY: Thêm lại phần else (fallback) >>>
+          <div>Vui lòng chọn một mục từ thanh bên.</div>
         )}
       </main>
 

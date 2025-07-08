@@ -97,7 +97,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, activeView, setAc
             )}
           </button>
           <button
-            onClick={() => setActiveView('invoiceRequests')}
+            onClick={() => setActiveView('invoice-requests')}
             className={`flex items-center w-full p-3 rounded-lg ${
               activeView === 'invoiceRequests'
                 ? 'bg-blue-100 dark:bg-blue-900'

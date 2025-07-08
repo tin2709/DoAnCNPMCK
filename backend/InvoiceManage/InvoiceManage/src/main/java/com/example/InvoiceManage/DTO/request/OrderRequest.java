@@ -14,12 +14,15 @@ import lombok.RequiredArgsConstructor;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 @Data
 @AllArgsConstructor
 @RequiredArgsConstructor
 public class OrderRequest {
-    private BigDecimal total;
     private int idStatus;
-    private List<Integer> proList;
+
+    // Thay thế List bằng Map
+    // Key sẽ là productId, Value sẽ là quantity
+    private Map<Integer, Integer> items;
 }

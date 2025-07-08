@@ -7,6 +7,7 @@ import com.example.InvoiceManage.config.constants.SecurityConstants;
 import com.example.InvoiceManage.entity.Order;
 import com.example.InvoiceManage.entity.SecurityUser;
 import com.example.InvoiceManage.mapper.OrderMapper;
+import com.example.InvoiceManage.repository.InvoiceRequestRepository;
 import com.example.InvoiceManage.service.OrderService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,8 @@ public class OrderController {
     OrderService orderService;
     @Autowired
     OrderMapper orderMapper;
+    @Autowired
+    private InvoiceRequestRepository invoiceRequestRepository;
     private Instant parseDate(String dateStr, boolean isEnd) {
         if (dateStr == null || dateStr.isBlank()) {
             return isEnd ? Instant.now() : LocalDate.now().minusYears(1).atStartOfDay().toInstant(ZoneOffset.UTC);
@@ -63,17 +66,33 @@ public class OrderController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<Void> addOrder(@RequestBody OrderRequest request) {
-        orderService.addOrder(request);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<OrderResponseDTO> addOrder(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @RequestBody OrderRequest request) {
+        Order createdOrder = orderService.addOrder(request);
+        OrderResponseDTO responseDTO = orderMapper.toOrderResponseDTO(createdOrder);
+        return new ResponseEntity<>(responseDTO, HttpStatus.CREATED);
+
     }
     @PutMapping("/update")
-    public ResponseEntity<Void> updateOrder(@RequestBody OrderUpdate request) {
+    public ResponseEntity<Void> updateOrder(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @RequestBody OrderUpdate request) {
         orderService.updateOrder(request.getOrderId(), request.getStatusId());
         return ResponseEntity.ok().build();
     }
+    @DeleteMapping("/{orderId}")
+    public ResponseEntity<Void> undoOrder(
+            @AuthenticationPrincipal SecurityUser securityUser,
+            @PathVariable Integer orderId) {
+        orderService.undoOrderCreation(orderId);
+        // Trả về mã 204 No Content - tiêu chuẩn cho một yêu cầu DELETE thành công
+        return ResponseEntity.noContent().build();
+    }
     @GetMapping("/list")
-    public ResponseEntity<List<Order>> getOrders() {
+    public ResponseEntity<List<Order>> getOrders(
+            @AuthenticationPrincipal SecurityUser securityUser
+            ) {
         List<Order> list = orderService.getAllOrders();
         return ResponseEntity.ok(list);
     }

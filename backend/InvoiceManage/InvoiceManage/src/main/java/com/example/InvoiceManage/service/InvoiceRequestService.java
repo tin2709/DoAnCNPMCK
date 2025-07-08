@@ -1,13 +1,17 @@
 package com.example.InvoiceManage.service;
 
 import com.example.InvoiceManage.DTO.request.InvoiceRequestPendingDTO;
+import com.example.InvoiceManage.DTO.response.InvoiceRequestResponse;
 import com.example.InvoiceManage.entity.Invoice;
 import com.example.InvoiceManage.entity.InvoiceRequest;
+import com.example.InvoiceManage.entity.Order;
 import com.example.InvoiceManage.entity.Status;
 import com.example.InvoiceManage.repository.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -78,7 +82,70 @@ public class InvoiceRequestService {
         invoiceRequestRepository.save(request);
     }
 
-    public List<InvoiceRequest> getAll() {
-        return invoiceRequestRepository.findAll();
+    public List<InvoiceRequestResponse> getAll() {
+        // Lấy danh sách entity từ database
+        List<InvoiceRequest> requests = invoiceRequestRepository.findAll();
+
+        // Sử dụng Stream API để chuyển đổi mỗi entity thành DTO
+        return requests.stream()
+                .map(this::convertToDto) // Gọi hàm trợ giúp để chuyển đổi
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Hàm trợ giúp để chuyển đổi một InvoiceRequest (Entity) sang InvoiceRequestResponseDTO.
+     * @param request Entity nguồn
+     * @return DTO kết quả
+     */
+    private InvoiceRequestResponse convertToDto(InvoiceRequest request) {
+        return InvoiceRequestResponse.builder()
+                .id(Long.valueOf(request.getId()))
+                .orderId(request.getOrder().getId())
+                .userName(request.getUser().getName())
+                .statusId(request.getStatus().getId())
+                .statusName(request.getStatus().getStatusName())
+                .createdAt(LocalDateTime.parse(request.getCreatedAt().toString())) // Chuyển sang String để JSON xử lý dễ dàng
+                .build();
+    }
+    @Transactional // Annotation này rất quan trọng để đảm bảo tính toàn vẹn dữ liệu
+    public InvoiceRequest updateInvoiceRequestStatus(Long requestId, Integer newStatusId) {
+        // 1. Kiểm tra ID trạng thái mới có hợp lệ không
+        if (newStatusId < 1 || newStatusId > 3) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Trạng thái mới không hợp lệ. Chỉ chấp nhận 1, 2, hoặc 3.");
+        }
+
+        // 2. Tìm yêu cầu hóa đơn hoặc báo lỗi
+        InvoiceRequest request = invoiceRequestRepository.findById(requestId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy yêu cầu hóa đơn với ID: " + requestId));
+
+        // 3. Không cho phép thay đổi nếu đã ở trạng thái "Đã thanh toán"
+        if (request.getStatus().getId() == 4) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Không thể thay đổi trạng thái của yêu cầu đã được thanh toán.");
+        }
+
+        // 4. Tìm trạng thái mới hoặc báo lỗi
+        Status newStatus = statusRepository.findById(newStatusId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy trạng thái với ID: " + newStatusId));
+
+        // --- LOGIC MỚI BẮT ĐẦU TẠI ĐÂY ---
+
+        // 5. Lấy đơn hàng (Order) liên quan từ yêu cầu
+        Order orderToUpdate = request.getOrder();
+        if (orderToUpdate == null) {
+            // Trường hợp này không nên xảy ra nếu ràng buộc DB là not-null
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Yêu cầu hóa đơn không liên kết với đơn hàng nào.");
+        }
+
+        // 6. Cập nhật trạng thái cho đơn hàng đó
+        orderToUpdate.setStatus(newStatus);
+        orderRepository.save(orderToUpdate); // Lưu lại thay đổi trên Order
+
+        // --- LOGIC CŨ VẪN GIỮ NGUYÊN ---
+
+        // 7. Cập nhật trạng thái cho chính yêu cầu hóa đơn
+        request.setStatus(newStatus);
+
+        // 8. Lưu và trả về yêu cầu đã được cập nhật
+        return invoiceRequestRepository.save(request);
     }
 }

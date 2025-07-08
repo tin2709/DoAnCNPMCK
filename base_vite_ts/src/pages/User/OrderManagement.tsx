@@ -8,15 +8,14 @@ import axios from 'axios';
 import {
   FiHome,
   FiLogOut,
-  FiAlertCircle,
   FiX,
   FiFileText,
   FiEye,
   FiPackage,
-  FiSun,   // Thêm mới
-  FiMoon,  // Thêm mới
+  FiSun, // Thêm mới
+  FiMoon, // Thêm mới
   FiCreditCard // Thêm mới cho nút thanh toán
-} from 'react-icons/fi';
+} from 'react-icons/fi'
 
 // --- THÊM MỚI: Import các thư viện xuất file ---
 import jsPDF from 'jspdf';

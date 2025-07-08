@@ -17,11 +17,13 @@ import com.example.InvoiceManage.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,7 +35,7 @@ public class OrderService {
     @Autowired
     UserRepository userRepository;
     @Autowired
-    OrderDetailRepository orderDetailRepository;
+    private InvoiceRequestRepository invoiceRequestRepository;
     @Autowired
     StatusRepository statusRepository;
     @Autowired
@@ -48,29 +50,100 @@ public class OrderService {
     public List<Order> getAllOrders() {
         return orderRepository.findAll();
     }
-    public void addOrder(OrderRequest request){
-        Order newOne = new Order();
-        String email = SecurityContextHolder.getContext()
-                .getAuthentication().getName();
-        User a = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalAccessError("User không tồn tại"));
-        Status b = statusRepository.findById(request.getIdStatus())
-                .orElseThrow(() -> new IllegalAccessError("Trạng thái không tồn tại"));
-        newOne.setDate(Instant.now());
-//        newOne.setPicture(request.getPicture());
-        newOne.setTotal(request.getTotal());
-        newOne.setStatus(b);
-        newOne.setCreatedBy(a);
-        orderRepository.save(newOne);
+    @Transactional // Rất quan trọng để đảm bảo tính toàn vẹn dữ liệu
+    public Order addOrder(OrderRequest request) {
+        // 1. Lấy thông tin người dùng và trạng thái (không đổi)
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User currentUser = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User không tồn tại"));
 
-//        newOne.setTokenOrder(request.getTokenOrder());
-        for(Integer i : request.getProList()){
-            Product newPro = productRepository.findById(i).orElseThrow(()-> new IllegalStateException("Sản phẩm này không tồn tại"));
-            OrderDetail newOrderDetail = new OrderDetail(newOne,newPro,1,newPro.getPrice());
-            orderDetailRepository.save(newOrderDetail);
+        Status orderStatus = statusRepository.findById(request.getIdStatus())
+                .orElseThrow(() -> new IllegalStateException("Trạng thái đơn hàng không tồn tại"));
+
+        // 2. Tạo đối tượng Order chính (không đổi)
+        Order newOrder = new Order();
+        newOrder.setCreatedBy(currentUser);
+        newOrder.setStatus(orderStatus);
+        newOrder.setDate(Instant.now());
+
+        BigDecimal calculatedTotal = BigDecimal.ZERO;
+        List<OrderDetail> detailsForOrder = new ArrayList<>();
+
+        // 3. Lặp qua Map để tạo OrderDetail và cập nhật số lượng sản phẩm (không đổi)
+        for (Map.Entry<Integer, Integer> item : request.getItems().entrySet()) {
+            Integer productId = item.getKey();
+            Integer requestedQuantity = item.getValue();
+
+            Product product = productRepository.findById(productId)
+                    .orElseThrow(() -> new IllegalStateException("Sản phẩm với ID " + productId + " không tồn tại"));
+
+            int currentStock = product.getQuantity();
+
+            if (currentStock < requestedQuantity) {
+                throw new IllegalStateException(
+                        String.format("Không đủ hàng cho sản phẩm '%s'. Yêu cầu: %d, Tồn kho: %d",
+                                product.getProductName(), requestedQuantity, currentStock)
+                );
+            }
+
+            product.setQuantity(currentStock - requestedQuantity);
+
+            OrderDetail orderDetail = new OrderDetail(
+                    newOrder,
+                    product,
+                    requestedQuantity,
+                    product.getPrice()
+            );
+
+            detailsForOrder.add(orderDetail);
+            calculatedTotal = calculatedTotal.add(orderDetail.getSubtotal());
         }
 
+        // 4. Gán tổng giá trị và danh sách chi tiết cho Order (không đổi)
+        newOrder.setTotal(calculatedTotal);
+        newOrder.setOrderDetails(detailsForOrder);
 
+        // 5. Lưu Order và các OrderDetail liên quan.
+        // Hành động này sẽ trả về đối tượng Order đã được lưu và có ID.
+        Order savedOrder = orderRepository.save(newOrder);
+
+        // <<< LOGIC MỚI: TẠO INVOICE REQUEST TƯƠNG ỨNG >>>
+        // 6. Lấy trạng thái "pending" (ID = 1) cho yêu cầu hóa đơn
+        Status pendingInvoiceStatus = statusRepository.findById(1) // Giả định ID 1 là "Pending"
+                .orElseThrow(() -> new IllegalStateException("Trạng thái 'Pending' cho yêu cầu hóa đơn (ID 1) không tồn tại."));
+
+        // 7. Tạo đối tượng InvoiceRequest mới
+        InvoiceRequest invoiceRequest = new InvoiceRequest();
+        invoiceRequest.setUser(currentUser); // Người dùng đã tạo đơn hàng
+        invoiceRequest.setOrder(savedOrder);   // Đơn hàng vừa được tạo
+        invoiceRequest.setStatus(pendingInvoiceStatus); // Trạng thái luôn là "pending"
+
+        // 8. Lưu InvoiceRequest vào cơ sở dữ liệu
+        invoiceRequestRepository.save(invoiceRequest);
+        // <<< KẾT THÚC LOGIC MỚI >>>
+
+        // 9. Trả về đối tượng Order đã tạo để Controller xử lý response
+        return savedOrder;
+    }
+
+    @Transactional
+    public void undoOrderCreation(Integer orderId) {
+        // 1. Tìm đơn hàng hoặc ném lỗi nếu không tồn tại
+        Order orderToUndo = orderRepository.findById(orderId)
+                .orElseThrow(() -> new IllegalStateException("Đơn hàng với ID " + orderId + " không tồn tại để hoàn tác."));
+
+        // 2. Lặp qua từng chi tiết đơn hàng để khôi phục số lượng sản phẩm
+        for (OrderDetail detail : orderToUndo.getOrderDetails()) {
+            Product product = detail.getProduct();
+            int orderedQuantity = detail.getQuantity();
+
+            // Cộng lại số lượng đã đặt vào kho
+            product.setQuantity(product.getQuantity() + orderedQuantity);
+            // Không cần gọi productRepository.save() vì đang trong giao dịch
+        }
+
+        // 3. Xóa đơn hàng. Do có `cascade` và `orphanRemoval`, các `OrderDetail` liên quan sẽ tự động bị xóa.
+        orderRepository.delete(orderToUndo);
     }
     // thay đổi trang thái đơn hàng
     public void updateOrder(int orderId,int statusId){

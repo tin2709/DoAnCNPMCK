@@ -1,11 +1,13 @@
+// src/pages/User/ProductManagement.tsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import axios from 'axios';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; // Import hàm một cách tường minh
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import Chatbox from '../Chatbox.tsx'; // (Điều chỉnh đường dẫn nếu cần)
+
 // --- ICONS TỪ REACT-ICONS ---
 import {
   FiEdit,
@@ -19,7 +21,7 @@ import {
   FiPlus,
   FiMinus,
   FiHome,
-  FiSun,  // Thêm vào
+  FiSun,
   FiMoon
 } from 'react-icons/fi';
 
@@ -122,26 +124,31 @@ export default function ProductManagement() {
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation(); // Hook để xác định trang hiện tại
-  // THÊM KHỐI CODE MỚI NÀY VÀO VỊ TRÍ VỪA XÓA
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
-  // --- Logic quản lý Dark Mode bằng class của Tailwind ---
+  // State cho phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const toggleChat = () => {
+    setIsChatOpen(!isChatOpen);
+  };
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    // 1. Ưu tiên lựa chọn đã lưu trong localStorage
     if (localStorage.theme === 'dark') {
       return true;
     }
-    // 2. Nếu không có, kiểm tra theme của hệ điều hành
     if (localStorage.theme === 'light') {
       return false;
     }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
-  // useEffect để áp dụng class và lưu lựa chọn
   useEffect(() => {
-    const root = document.documentElement; // Thẻ <html>
+    const root = document.documentElement;
     if (isDarkMode) {
       root.classList.add('dark');
       localStorage.setItem('theme', 'dark');
@@ -151,14 +158,13 @@ export default function ProductManagement() {
     }
   }, [isDarkMode]);
 
-  // Hàm toggle đơn giản chỉ cần thay đổi state
   const toggleDarkMode = () => {
     setIsDarkMode(!isDarkMode);
   };
+
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     try {
       const savedCart = sessionStorage.getItem('cartItems');
-      // Nếu có dữ liệu trong sessionStorage, parse nó ra. Nếu không, trả về mảng rỗng.
       return savedCart ? JSON.parse(savedCart) : [];
     } catch (error) {
       console.error("Failed to parse cart items from sessionStorage", error);
@@ -166,7 +172,6 @@ export default function ProductManagement() {
     }
   });
 
-  // MỚI: Sử dụng useEffect để tự động lưu giỏ hàng vào sessionStorage mỗi khi nó thay đổi
   useEffect(() => {
     sessionStorage.setItem('cartItems', JSON.stringify(cartItems));
   }, [cartItems]);
@@ -190,43 +195,6 @@ export default function ProductManagement() {
       Swal.fire('Lỗi', 'Không thể tải danh sách danh mục.', 'error');
     }
   }, []);
-
-  const handleExportPDF = () => {
-
-  };
-
-  const handleExportExcel = () => {
-    if (filteredProducts.length === 0) {
-      Swal.fire('Không có dữ liệu', 'Không có sản phẩm nào để xuất file Excel.', 'warning');
-      return;
-    }
-
-    const fileType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8';
-    const fileExtension = '.xlsx';
-
-    // Tạo một worksheet từ dữ liệu sản phẩm đã lọc
-    const worksheetData = filteredProducts.map(product => ({
-      'Tên sản phẩm': product.productName,
-      'Danh mục': product.categoryName,
-      'Giá (VNĐ)': product.price, // Giữ dạng số để có thể tính toán trong Excel
-      'Mô tả': product.des,
-      'Số lượng còn lại': product.quantity
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(worksheetData);
-
-    // Tạo workbook và thêm worksheet vào
-    const wb = { Sheets: { 'Sản phẩm': ws }, SheetNames: ['Sản phẩm'] };
-
-    // Ghi workbook ra một buffer
-    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-
-    // Tạo Blob từ buffer
-    const data = new Blob([excelBuffer], { type: fileType });
-
-    // Dùng file-saver để lưu file
-    saveAs(data, 'danh-sach-san-pham' + fileExtension);
-  };
 
   const fetchProducts = useCallback(async (token: string, categoryId: string) => {
     setLoading(true);
@@ -272,6 +240,15 @@ export default function ProductManagement() {
     product.productName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedCategoryId, searchTerm, itemsPerPage]);
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+
   const handleLogout = () => {
     localStorage.removeItem('userLoginInfo');
     Swal.fire({ icon: 'success', title: 'Đăng xuất thành công!', showConfirmButton: false, timer: 1500 });
@@ -285,6 +262,7 @@ export default function ProductManagement() {
       cancelButtonColor: '#6b7280', confirmButtonText: 'Đồng ý, xóa!', cancelButtonText: 'Hủy'
     }).then((result) => {
       if (result.isConfirmed) {
+        // Đây là nơi để gọi API xóa sản phẩm
         console.log(`Deleting product with ID: ${productId}`);
         Swal.fire('Đã xóa!', `Sản phẩm "${productName}" đã được xóa.`, 'success');
       }
@@ -328,51 +306,38 @@ export default function ProductManagement() {
     const payload = { idStatus: 1, items: itemsPayload };
 
     try {
-      // THAY ĐỔI: Chờ response trả về, trong đó có ID của đơn hàng
       const response = await axios.post('http://localhost:8080/api/orders/add', payload, {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentUser.accessToken}` },
       });
-
-      // Lấy ID đơn hàng từ response
       const createdOrderId = response.data.id;
-
-      // THAY ĐỔI: Hiển thị toast thay vì alert thông thường
       const Toast = Swal.mixin({
         toast: true,
         position: 'top-end',
         showConfirmButton: false,
-        timer: 5000, // Toast tự đóng sau 5 giây
+        showCloseButton: true,
+        timer: 5000,
         timerProgressBar: true,
         didOpen: (toast) => {
           toast.onmouseenter = Swal.stopTimer;
           toast.onmouseleave = Swal.resumeTimer;
         }
       });
-
       Toast.fire({
         icon: 'success',
         title: 'Tạo yêu cầu thành công!',
-        // THAY ĐỔI: Thêm nút "Hoàn tác" vào toast
-        html: `
-                    <div>Đã tạo yêu cầu hóa đơn.</div>
-                    <button id="undo-button" class="swal2-confirm swal2-styled" style="background-color: #f87171; margin-top: 10px;">Hoàn tác</button>
-                `,
+        html: `<div>Đã tạo yêu cầu hóa đơn.</div><button id="undo-button" class="swal2-confirm swal2-styled" style="background-color: #f87171; margin-top: 10px;">Hoàn tác</button>`,
         didOpen: () => {
           const undoButton = document.getElementById('undo-button');
           if (undoButton) {
             undoButton.addEventListener('click', () => {
-              // Gọi hàm xử lý hoàn tác khi nút được nhấn
               handleUndo(createdOrderId);
-              Swal.close(); // Đóng toast sau khi nhấn hoàn tác
+              Swal.close();
             });
           }
         }
       });
-
-      // Reset giỏ hàng và fetch lại sản phẩm để cập nhật số lượng
       setCartItems([]);
       fetchProducts(currentUser.accessToken, selectedCategoryId);
-
     } catch (err: any) {
       console.error('Lỗi khi gọi API tạo hóa đơn:', err);
       const errorMessage = err.response?.data?.message || 'Không thể tạo hóa đơn. Vui lòng thử lại.';
@@ -380,34 +345,50 @@ export default function ProductManagement() {
     }
   };
 
-  // MỚI: Hàm xử lý khi người dùng nhấn nút "Hoàn tác"
   const handleUndo = async (orderId: number) => {
     const currentUser = getAuthInfo();
     if (!currentUser) return;
-
     try {
-      // Gọi API DELETE mới tạo ở backend
       await axios.delete(`http://localhost:8080/api/orders/${orderId}`, {
         headers: { Authorization: `Bearer ${currentUser.accessToken}` },
       });
-
       Swal.fire('Đã hoàn tác!', 'Đơn hàng đã được xóa và số lượng sản phẩm đã được khôi phục.', 'success');
-
-      // Quan trọng: Fetch lại dữ liệu sản phẩm để cập nhật UI
       fetchProducts(currentUser.accessToken, selectedCategoryId);
-
     } catch (err: any) {
       console.error('Lỗi khi hoàn tác đơn hàng:', err);
       Swal.fire('Lỗi!', 'Không thể hoàn tác đơn hàng. Vui lòng thử lại.', 'error');
     }
   };
+
+  const handleExportExcel = () => {
+    if (filteredProducts.length === 0) {
+      Swal.fire('Không có dữ liệu', 'Không có sản phẩm nào để xuất file Excel.', 'warning');
+      return;
+    }
+    const fileType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8';
+    const fileExtension = '.xlsx';
+    const worksheetData = filteredProducts.map(product => ({
+      'Tên sản phẩm': product.productName,
+      'Danh mục': product.categoryName,
+      'Giá (VNĐ)': product.price,
+      'Mô tả': product.des,
+      'Số lượng còn lại': product.quantity
+    }));
+    const ws = XLSX.utils.json_to_sheet(worksheetData);
+    const wb = { Sheets: { 'Sản phẩm': ws }, SheetNames: ['Sản phẩm'] };
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: fileType });
+    saveAs(data, 'danh-sach-san-pham' + fileExtension);
+  };
+
   const navItems = [
     { path: '/products', label: 'Sản phẩm' },
     { path: '/user', label: 'Người dùng' },
     { path: '/orders', label: 'Đơn hàng' },
   ];
+
   if (loading && products.length === 0) {
-    return <div className="flex justify-center items-center h-screen">Đang tải dữ liệu...</div>;
+    return <div className="flex justify-center items-center h-screen dark:bg-gray-900 dark:text-white">Đang tải dữ liệu...</div>;
   }
 
   return (
@@ -415,24 +396,13 @@ export default function ProductManagement() {
       <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center h-16">
           <div className="flex items-center gap-4">
-            {/* Vùng chứa dropdown, quản lý sự kiện hover */}
-            <div
-              className="relative"
-              onMouseEnter={() => setIsDropdownOpen(true)}
-              onMouseLeave={() => setIsDropdownOpen(false)}
-            >
-              <button className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-indigo-600 focus:outline-none transition-colors">
+            <div className="relative" onMouseEnter={() => setIsDropdownOpen(true)} onMouseLeave={() => setIsDropdownOpen(false)}>
+              <button className="p-2 rounded-full text-gray-500 hover:bg-gray-100 hover:text-indigo-600 focus:outline-none transition-colors dark:text-gray-300 dark:hover:bg-gray-700">
                 <FiHome size={22} />
               </button>
-
-              {/* Menu dropdown, hiển thị có điều kiện */}
               {isDropdownOpen && (
-                // SỬA LỖI Ở ĐÂY:
-                // 1. Xóa class `mt-2` để loại bỏ khoảng trống.
-                // 2. Thêm class `top-full` để định vị menu ngay dưới phần tử cha.
-                // 3. Thêm một chút `pt-2` (padding-top) để tạo khoảng đệm ảo bên trong, không ảnh hưởng đến vùng hover.
                 <div className="absolute left-0 top-full pt-2 w-48 z-30">
-                  <div className="bg-white rounded-lg shadow-xl py-2">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl py-2">
                     <ul>
                       {navItems.map((item) => {
                         const isActive = location.pathname.startsWith(item.path);
@@ -441,9 +411,9 @@ export default function ProductManagement() {
                             <Link
                               to={item.path}
                               className={`flex items-center px-4 py-2 text-sm transition-colors
-                    ${isActive
-                                ? 'bg-indigo-100 text-indigo-700 font-semibold' // Style cho link active
-                                : 'text-gray-700 hover:bg-gray-100' // Style cho link thường
+                                ${isActive
+                                ? 'bg-indigo-100 text-indigo-700 font-semibold dark:bg-gray-900 dark:text-indigo-400'
+                                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
                               }`
                               }
                             >
@@ -457,13 +427,9 @@ export default function ProductManagement() {
                 </div>
               )}
             </div>
-
-            <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">
-              Quản lý Sản phẩm
-            </h1>
+            <h1 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Quản lý Sản phẩm</h1>
           </div>
           <div className="flex items-center gap-6">
-
             <button onClick={() => setIsModalOpen(true)} className="relative text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
               <FiShoppingCart size={24} />
               {totalCartQuantity > 0 && (
@@ -475,7 +441,6 @@ export default function ProductManagement() {
             <button onClick={toggleDarkMode} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" aria-label={isDarkMode ? "Chuyển sang chế độ Sáng" : "Chuyển sang chế độ Tối"}>
               {isDarkMode ? <FiSun size={22} className="text-orange-400" /> : <FiMoon size={22} />}
             </button>
-
             <button onClick={handleLogout} className="flex items-center gap-2 text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
               <FiLogOut /><span>Đăng xuất</span>
             </button>
@@ -484,54 +449,27 @@ export default function ProductManagement() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* SỬA LỖI: Thêm lại các khối JSX bị thiếu */}
-        <nav className="mb-4">
-
-        </nav>
-
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4 flex justify-between items-center" role="alert">
-            <div className="flex items-center">
-              <FiAlertCircle className="mr-2"/>
-              <span className="block sm:inline">{error}</span>
-            </div>
-            <button onClick={() => setError(null)}><FiX/></button>
+            <div className="flex items-center"><FiAlertCircle className="mr-2" /><span className="block sm:inline">{error}</span></div>
+            <button onClick={() => setError(null)}><FiX /></button>
           </div>
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
           <div className="flex flex-wrap items-center gap-4">
-            <select
-              value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
-              className="p-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
+            <select value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)} className="p-2 border border-gray-300 rounded-lg bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
               <option value="All">Tất cả danh mục</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
+              {categories.map((category) => (<option key={category.id} value={category.id}>{category.name}</option>))}
             </select>
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo tên sản phẩm..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="p-2 border border-gray-300 rounded-lg w-64 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <input type="text" placeholder="Tìm kiếm theo tên sản phẩm..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="p-2 border border-gray-300 rounded-lg w-64 dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-
-            <button
-              onClick={handleExportExcel}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500 flex items-center gap-2 transition-colors"
-            >
-              <FiFileText/> Xuất Excel
+            <button onClick={handleExportExcel} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-600 dark:text-white dark:border-gray-500 dark:hover:bg-gray-500 flex items-center gap-2 transition-colors">
+              <FiFileText /> Xuất Excel
             </button>
           </div>
         </div>
-        {/* Kết thúc khối JSX được thêm lại */}
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
           <div className="overflow-x-auto">
@@ -548,14 +486,12 @@ export default function ProductManagement() {
               </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-              {!loading && filteredProducts.length > 0 ? (
-                filteredProducts.map((product) => {
+              {!loading && currentItems.length > 0 ? (
+                currentItems.map((product) => {
                   const isInCart = cartItems.some(item => item.product.id === product.id);
                   return (
                     <tr key={product.id} className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isInCart ? 'bg-blue-50 dark:bg-blue-900/50' : ''}`}>
-                      <td className="px-6 py-4 text-center">
-                        <input type="checkbox" checked={isInCart} onChange={() => handleToggleCartItem(product)} disabled={product.quantity <= 0 && !isInCart} className="rounded h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 disabled:cursor-not-allowed disabled:bg-gray-200" />
-                      </td>
+                      <td className="px-6 py-4 text-center"><input type="checkbox" checked={isInCart} onChange={() => handleToggleCartItem(product)} disabled={product.quantity <= 0 && !isInCart} className="rounded h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 disabled:cursor-not-allowed disabled:bg-gray-200 dark:bg-gray-600 dark:border-gray-500" /></td>
                       <td className="px-6 py-4"><img src={product.image} alt={product.productName} className="h-12 w-12 object-cover rounded-md" /></td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{product.productName}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{product.categoryName}</td>
@@ -563,22 +499,83 @@ export default function ProductManagement() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{product.quantity}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex items-center gap-2">
-                          <button className="text-blue-600 hover:text-blue-900"><FiEdit /></button>
-                          <button onClick={() => handleDelete(product.id, product.productName)} className="text-red-600 hover:text-red-900"><FiTrash2 /></button>
+                          <button className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"><FiEdit /></button>
+                          <button onClick={() => handleDelete(product.id, product.productName)} className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"><FiTrash2 /></button>
                         </div>
                       </td>
                     </tr>
-                  )
+                  );
                 })
               ) : (
-                <tr><td colSpan={7} className="px-6 py-4 text-center text-gray-500">Không có sản phẩm nào phù hợp.</td></tr>
+                <tr><td colSpan={7} className="px-6 py-4 text-center text-gray-500 dark:text-gray-300">{loading ? 'Đang tải...' : 'Không có sản phẩm nào phù hợp.'}</td></tr>
               )}
               </tbody>
             </table>
           </div>
+          {totalPages > 0 && (
+            <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6">
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button onClick={() => setCurrentPage(c => Math.max(1, c - 1))} disabled={currentPage === 1} className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Previous</button>
+                <button onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))} disabled={currentPage === totalPages} className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">Next</button>
+              </div>
+              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    Hiển thị <span className="font-medium">{indexOfFirstItem + 1}</span> - <span className="font-medium">{Math.min(indexOfLastItem, filteredProducts.length)}</span> trên <span className="font-medium">{filteredProducts.length}</span> sản phẩm
+                  </p>
+                  <select id="itemsPerPage" value={itemsPerPage} onChange={(e) => setItemsPerPage(Number(e.target.value))} className="p-1 border border-gray-300 rounded-lg text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value={5}>5 / trang</option>
+                    <option value={10}>10 / trang</option>
+                    <option value={20}>20 / trang</option>
+                    <option value={50}>50 / trang</option>
+                  </select>
+                </div>
+                <div>
+                  <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                    <button onClick={() => setCurrentPage(c => Math.max(1, c - 1))} disabled={currentPage === 1} className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50">
+                      <span className="sr-only">Previous</span>
+                      {'<'}
+                    </button>
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(pageNumber => (
+                      <button key={pageNumber} onClick={() => setCurrentPage(pageNumber)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${currentPage === pageNumber ? 'z-10 bg-blue-50 border-blue-500 text-blue-600 dark:bg-gray-900 dark:border-blue-400 dark:text-white' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'}`}>
+                        {pageNumber}
+                      </button>
+                    ))}
+                    <button onClick={() => setCurrentPage(c => Math.min(totalPages, c + 1))} disabled={currentPage === totalPages} className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 disabled:opacity-50">
+                      <span className="sr-only">Next</span>
+                      {'>'}
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </main>
+
       <InvoiceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} items={cartItems} onQuantityChange={handleQuantityChange} onCreateInvoice={handleCreateInvoice} />
+
+      {!isChatOpen && (
+        <button
+          onClick={toggleChat}
+          style={{
+            position: 'fixed', bottom: '30px', right: '30px', width: '60px', height: '60px',
+            borderRadius: '50%', backgroundColor: '#4299E1', color: 'white', border: 'none',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.25)', cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', fontSize: '28px', zIndex: 999,
+            transition: 'transform 0.2s ease-in-out',
+          }}
+          onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+          onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
+          aria-label="Open Chat"
+        >
+          💬
+        </button>
+      )}
+
+      <div className={isChatOpen ? 'block' : 'hidden'}>
+        <Chatbox onClose={toggleChat} />
+      </div>
     </div>
   );
 }

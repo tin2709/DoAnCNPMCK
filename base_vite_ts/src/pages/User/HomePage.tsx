@@ -138,6 +138,7 @@ const HomePage: React.FC = () => {
           title: `Bạn có thông báo mới về đơn hàng!`,
           html: finalHtml,
           showConfirmButton: false,
+          showCloseButton: true,
           timer: 7000, // Tăng thời gian hiển thị lên một chút
           timerProgressBar: true,
           didOpen: (toast) => {
@@ -485,11 +486,12 @@ const HomePage: React.FC = () => {
         </button>
       )}
 
-      {isChatOpen && (
+      <div className={isChatOpen ? 'block' : 'hidden'}>
         <Chatbox
           onClose={toggleChat}
         />
-      )}
+      </div>
+
 
     </div>
   );
